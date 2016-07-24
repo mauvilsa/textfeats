@@ -6,8 +6,8 @@
  */
 
 /*
- @todo Better parallelization: threads also read pages
- @todo Configuration from file, e.g. ini format, use glib?
+ @todo Better parallelization: i.e. threads also read pages
+ @todo Fix output list of extractions
 */
 
 /*** Includes *****************************************************************/
@@ -37,37 +37,21 @@ FILE *logfile = NULL;
 int verbosity = 1;
 
 char   gb_default_outdir[] = ".";
-//char   gb_default_featype[] = "dotm";
-//char   gb_default_format[] = "htk";
 char   gb_default_feaext[] = "fea";
+char   gb_default_imgext[] = "png";
 char   gb_default_xpath[] = "//_:TextRegion/_:TextLine/_:Coords[@points and @points!=\"0,0 0,0\"]";
 
 char  *gb_cfgfile = NULL;
 bool   gb_overwrite = false;
 char  *gb_outdir = gb_default_outdir;
 bool   gb_featlist = false;
-//char  *gb_featype = gb_default_featype;
-//char  *gb_format = gb_default_format;
 char  *gb_feaext = gb_default_feaext;
+char  *gb_imgext = gb_default_imgext;
 char  *gb_xpath = gb_default_xpath;
 bool   gb_saveclean = false;
 bool   gb_savefeaimg = false;
 bool   gb_savexml = false;
-//int    gb_enh_win = 20;
-//double gb_enh_prm = 0.1;
-//double gb_enh_prm_randmin = 0.05;
-//double gb_enh_prm_randmax = 0.3;
-//bool   gb_slope = true;
-//bool   gb_slant = true;
-//int    gb_normxheight = 0;
-//bool   gb_fpgram = false;
-//bool   gb_fcontour = false;
 bool   gb_fpoints = true;
-//double gb_slide_shift = 2.0;
-//double gb_slide_span = 20;
-//int    gb_sample_width = 8;
-//int    gb_sample_height = 32;
-//char  *gb_projfile = NULL;
 int    gb_numrand = 0;
 bool   gb_firstrand = false;
 
@@ -94,23 +78,13 @@ enum {
   OPTION_OUTDIR    = 'o',
   OPTION_FEATLIST  = 'L',
   OPTION_FEATYPE   = 256,
-  //OPTION_FORMAT         ,
   OPTION_FEAEXT         ,
+  OPTION_IMGEXT         ,
   OPTION_XPATH          ,
   OPTION_SAVECLEAN      ,
   OPTION_SAVEFEAIMG     ,
   OPTION_SAVEXML        ,
-  //OPTION_ENH_WIN        ,
-  //OPTION_ENH_PRM        ,
-  //OPTION_SLOPE          ,
-  //OPTION_SLANT          ,
-  //OPTION_NORMXHEIGHT    ,
-  //OPTION_FPGRAM         ,
-  //OPTION_FCONTOUR       ,
   OPTION_FPOINTS        ,
-  //OPTION_SLIDING        ,
-  //OPTION_SAMPDIMS       ,
-  //OPTION_PROJFILE       ,
   OPTION_NUMRAND        ,
   OPTION_FIRSTRAND
 };
@@ -126,24 +100,13 @@ static struct option gb_long_options[] = {
     { "overwrite",   optional_argument, NULL, OPTION_OVERWRITE },
     { "outdir",      required_argument, NULL, OPTION_OUTDIR },
     { "featlist",    optional_argument, NULL, OPTION_FEATLIST },
-    //{ "featype",     required_argument, NULL, OPTION_FEATYPE },
-    //{ "format",      required_argument, NULL, OPTION_FORMAT },
     { "feaext",      required_argument, NULL, OPTION_FEAEXT },
+    { "imgext",      required_argument, NULL, OPTION_IMGEXT },
     { "xpath",       required_argument, NULL, OPTION_XPATH },
     { "saveclean",   optional_argument, NULL, OPTION_SAVECLEAN },
     { "savefeaimg",  optional_argument, NULL, OPTION_SAVEFEAIMG },
     { "savexml",     optional_argument, NULL, OPTION_SAVEXML },
-    //{ "enh-win",     required_argument, NULL, OPTION_ENH_WIN },
-    //{ "enh-prm",     required_argument, NULL, OPTION_ENH_PRM },
-    //{ "slope",       optional_argument, NULL, OPTION_SLOPE },
-    //{ "slant",       optional_argument, NULL, OPTION_SLANT },
-    //{ "normxheight", required_argument, NULL, OPTION_NORMXHEIGHT },
-    //{ "fpgram",      optional_argument, NULL, OPTION_FPGRAM },
-    //{ "fcontour",    optional_argument, NULL, OPTION_FCONTOUR },
     { "fpoints",     optional_argument, NULL, OPTION_FPOINTS },
-    //{ "sliding",     required_argument, NULL, OPTION_SLIDING },
-    //{ "sampdims",    required_argument, NULL, OPTION_SAMPDIMS },
-    //{ "projfile",    required_argument, NULL, OPTION_PROJFILE },
     { "rand",        required_argument, NULL, OPTION_NUMRAND },
     { "firstrand",   optional_argument, NULL, OPTION_FIRSTRAND },
     { 0, 0, 0, 0 }
@@ -160,28 +123,17 @@ void print_usage( FILE *file ) {
   fprintf( file, " -v --version                   Print tool version and exit\n" );
   fprintf( file, " -V --verbose[=(-|+|level)]     Verbosity level (def.=%d)\n", verbosity );
   fprintf( file, " -T --threads NUM               Number of parallel threads (def.=%d)\n", gb_numthreads );
-  fprintf( file, " -C --cfg CFGFILE               Feature extraction configuration file (def.=none)\n" );
+  fprintf( file, " -C --cfg CFGFILE               Configuration file for TextFeatExtractor and PageXML (def.=none)\n" );
   fprintf( file, " -O --overwrite[=(true|false)]  Overwrite existing files (def.=%s)\n", strbool(gb_overwrite) );
   fprintf( file, " -o --outdir OUTDIR             Output directory (def.=%s)\n", gb_outdir );
-  fprintf( file, " -L --featlist[=(true|false)]   Output list of extracted features to stdout (def.=%s)\n", strbool(gb_featlist) );
-  //fprintf( file, "    --featype (dotm|raw)        Feature extraction type (def.=%s)\n", gb_featype );
-  //fprintf( file, "    --format (ascii|htk|img)    Output features format, for img set feaext to a valid image format (def.=%s)\n", gb_format );
+  fprintf( file, " -L --featlist[=(true|false)]   Print list of extracted features to stdout (def.=%s)\n", strbool(gb_featlist) );
   fprintf( file, "    --feaext EXT                Output features file extension (def.=%s)\n", gb_feaext );
+  fprintf( file, "    --imgext EXT                Output images file extension (def.=%s)\n", gb_imgext );
   fprintf( file, "    --xpath XPATH               xpath for selecting text samples (def.=%s)\n", gb_xpath );
   fprintf( file, "    --saveclean[=(true|false)]  Save clean images (def.=%s)\n", strbool(gb_saveclean) );
   fprintf( file, "    --savefeaimg[=(true|false)] Save features images (def.=%s)\n", strbool(gb_savefeaimg) );
   fprintf( file, "    --savexml[=(true|false)]    Save XML with extraction information (def.=%s)\n", strbool(gb_savexml) );
-  //fprintf( file, "    --enh-win WIDTH             Width in pixels of enhancement window (def.=%d)\n", gb_enh_win );
-  //fprintf( file, "    --enh-prm PARAM[:MIN:MAX]   Enhancement parameter, optionally min and max for random (def.=%g:%g:%g)\n", gb_enh_prm, gb_enh_prm_randmin, gb_enh_prm_randmax );
-  //fprintf( file, "    --slope[=(true|false)]      Normalization of text slope (def.=%s)\n", strbool(gb_slope) );
-  //fprintf( file, "    --slant[=(true|false)]      Normalization of writing slant (def.=%s)\n", strbool(gb_slant) );
-  //fprintf( file, "    --normxheight HEIGHT        Normalize x-height to given value in pixels (def.=%s)\n", strbool(gb_normxheight) );
-  //fprintf( file, "    --fpgram[=(true|false)]     Compute feature parallelograms (def.=%s)\n", strbool(gb_fpgram) );
-  //fprintf( file, "    --fcontour[=(true|false)]   Compute feature contours (def.=%s)\n", strbool(gb_fcontour) );
   fprintf( file, "    --fpoints[=(true|false)]    Store feature contours in points attribute (def.=%s)\n", strbool(gb_fpoints) );
-  //fprintf( file, "    --sliding SHIFT[:SPAN]      Sliding window parameters (def.=%g:%g)\n", gb_slide_shift, gb_slide_span );
-  //fprintf( file, "    --sampdims WxH              Sample dimensions (def.=%dx%d)\n", gb_sample_width, gb_sample_height );
-  //fprintf( file, "    --projfile FILE             Project features with given hdf5 file (def.=false)\n" );
   fprintf( file, "    --rand NUM                  Number of random perturbed extractions per sample (def.=%d)\n", gb_numrand );
   fprintf( file, "    --firstrand[=(true|false)]  Whether the first extraction is perturbed (def.=%s)\n", strbool(gb_firstrand) );
 }
@@ -207,8 +159,6 @@ inline bool parse_bool( char* str ) {
 int main( int argc, char *argv[] ) {
   logfile = stderr;
 
-  //char *p;
-
   /// Parse input arguments ///
   int n,m;
   while( ( n = getopt_long(argc,argv,gb_short_options,gb_long_options,&m) ) != -1 )
@@ -222,18 +172,11 @@ int main( int argc, char *argv[] ) {
       case OPTION_FEATLIST:
         gb_featlist = parse_bool(optarg);
         break;
-      /*case OPTION_FEATYPE:
-        if( TextFeatExtractor::parseFeatType(optarg) < 0 )
-          die( "error: unknown feature extractino type: %s", optarg );
-        gb_featype = optarg;
-        break;
-      case OPTION_FORMAT:
-        if( TextFeatExtractor::parseFeatFormat(optarg) < 0 )
-          die( "error: unknown output features format: %s", optarg );
-        gb_format = optarg;
-        break;*/
       case OPTION_FEAEXT:
         gb_feaext = optarg;
+        break;
+      case OPTION_IMGEXT:
+        gb_imgext = optarg;
         break;
       case OPTION_XPATH:
         gb_xpath = optarg;
@@ -247,50 +190,9 @@ int main( int argc, char *argv[] ) {
       case OPTION_SAVEXML:
         gb_savexml = parse_bool(optarg);
         break;
-      /*case OPTION_ENH_WIN:
-        gb_enh_win = atoi(optarg);
-        break;
-      case OPTION_ENH_PRM:
-        gb_enh_prm = atof(optarg);
-        if( strchr(optarg,':') != NULL ) {
-          p = strchr(optarg,':')+1;
-          gb_enh_prm_randmin = atof(p);
-          if( strchr(p,':') != NULL )
-            gb_enh_prm_randmax = atof(strchr(p,':')+1);
-        }
-        break;
-      case OPTION_SLOPE:
-        gb_slope = parse_bool(optarg);
-        break;
-      case OPTION_SLANT:
-        gb_slant = parse_bool(optarg);
-        break;
-      case OPTION_NORMXHEIGHT:
-        gb_normxheight = atoi(optarg);
-        break;
-      case OPTION_FPGRAM:
-        gb_fpgram = parse_bool(optarg);
-        break;
-      case OPTION_FCONTOUR:
-        gb_fcontour = parse_bool(optarg);
-        break;*/
       case OPTION_FPOINTS:
         gb_fpoints = parse_bool(optarg);
         break;
-      /*case OPTION_SLIDING:
-        gb_slide_shift = atof(optarg);
-        if( strchr(optarg,':') != NULL )
-          gb_slide_span = atof(strchr(optarg,':')+1);
-        break;
-      case OPTION_SAMPDIMS:
-        if( strchr(optarg,'x') == NULL )
-          die( "error: expected sample dimensions to be of form WxH" );
-        gb_sample_width = atof(optarg);
-        gb_sample_height = atof(strchr(optarg,'x')+1);
-        break;
-      case OPTION_PROJFILE:
-        gb_projfile = optarg;
-        break;*/
       case OPTION_NUMRAND:
         gb_numrand = atoi(optarg);
         break;
@@ -327,82 +229,39 @@ int main( int argc, char *argv[] ) {
   if( optind >= argc )
     die( "error: expected at least one Page XML or line image file" );
 
-  //if( ! ( gb_slope || gb_slant || gb_fpgram || gb_fcontour ) )
-  //  gb_savexml = false;
-
   /// Print configuration ///
   logger( 3, "config: overwrite files: %s", strbool(gb_overwrite) );
   logger( 3, "config: output directory: %s", gb_outdir );
-  logger( 3, "config: output list of extracted features: %s", strbool(gb_featlist) );
-  //logger( 3, "config: feature extraction type: %s", gb_featype );
-  //logger( 3, "config: output format: %s", gb_format );
-  logger( 3, "config: output feature extension: %s", gb_feaext );
-  logger( 3, "config: text sample selector xpath: %s", gb_xpath );
+  logger( 3, "config: print list of extracted features: %s", strbool(gb_featlist) );
+  logger( 3, "config: output features file extension: %s", gb_feaext );
+  logger( 3, "config: output images file extension: %s", gb_imgext );
+  logger( 3, "config: text coords selector xpath: %s", gb_xpath );
   logger( 3, "config: save clean images: %s", strbool(gb_saveclean) );
   logger( 3, "config: save XML with extraction information: %s", strbool(gb_savexml) );
-  //logger( 3, "config: enhancement window: %d", gb_enh_win );
-  //logger( 3, "config: enhancement parameter: %g:%g:%g", gb_enh_prm, gb_enh_prm_randmin, gb_enh_prm_randmax );
-  //logger( 3, "config: normalize text slope: %s", strbool(gb_slope) );
-  //logger( 3, "config: normalize writing slant: %s", strbool(gb_slant) );
-  //logger( 3, "config: compute feature parallelograms: %s", strbool(gb_fpgram) );
-  //logger( 3, "config: compute feature contours: %s", strbool(gb_fcontour) );
   logger( 3, "config: store feature contours in points attribute: %s", strbool(gb_fpoints) );
-  //logger( 3, "config: sliding window: %g:%g", gb_slide_shift, gb_slide_span );
-  //logger( 3, "config: sample dimensions: %dx%d", gb_sample_width, gb_sample_height );
 
+  /// Load configuration ///
   Config cfg;
   if( gb_cfgfile != NULL )
-    cfg.readFile(gb_cfgfile);
-
-  /*char *buf = NULL;
-  size_t bufsize = 0;
-  FILE *filebuf = open_memstream(&buf,&bufsize);
-
-  cfg.write(filebuf);
-  fflush(filebuf);
-  printf("=====\n");
-  printf("buf = %p\n",buf);
-  printf("bufsize = %lu\n",bufsize);
-  printf("filebuf = %p\n",filebuf);
-  printf("%s\n",buf);
-  printf("=====\n");
-
-  cfg.readString( "TextFeatExtractor: { projfile = \"/tmp/pcab.mat.gz\"; }" );*/
+    try {
+      cfg.readFile(gb_cfgfile);
+    }
+    catch( const ParseException &pex ) {
+      die( "error: parse error in config file at line %d: %s", pex.getLine(), pex.getError() );
+    }
 
   /// Create feature extractor object ///
-  /*vector<ConfigProps> featcfg = {
-      { "verbose", verbosity >= 4 },
-      { "type", gb_featype },
-      { "format", gb_format },
-      { "enh_win", gb_enh_win },
-      { "enh_prm", gb_enh_prm },
-      { "enh_prm_randmin", gb_enh_prm_randmin },
-      { "enh_prm_randmax", gb_enh_prm_randmax },
-      { "slope", gb_slope },
-      { "slant", gb_slant },
-      { "normxheight", gb_normxheight },
-      { "fpgram", gb_fpgram },
-      { "fcontour", gb_fcontour },
-      { "slide_shift", gb_slide_shift },
-      { "slide_span", gb_slide_span },
-      { "sample_width", gb_sample_width },
-      { "sample_height", gb_sample_height },
-      { "projfile", gb_projfile }
-    };
-  TextFeatExtractor extractor(featcfg);*/
-  TextFeatExtractor extractor;
-  if( gb_cfgfile != NULL ) {
-    extractor.loadConf( cfg );
-    if( verbosity >= 3 )
-      extractor.printConf( logfile );
-  }
+  TextFeatExtractor extractor(cfg);
+  //extractor.loadConf( cfg );
+  if( verbosity >= 3 )
+    extractor.printConf( logfile );
   gb_extractor = &extractor;
 
   /// Create page loader object ///
-  vector<ConfigProps> pagecfg = {
-      { "loadimage", true }
-    };
-  PageXML page(pagecfg);
+  PageXML page(cfg);
+  //page.loadConf( cfg );
+  if( verbosity >= 3 )
+    page.printConf( logfile );
   gb_page = &page;
 
   /// Auxiliary stuff ///
@@ -519,7 +378,7 @@ void* extractionThread( void* _num ) {
     /// Clean and enhance image ///
     gb_extractor->preprocess( prepimage, &fcontour );
     if( gb_saveclean ) {
-      string outfile = string(gb_outdir)+'/'+gb_images[image_num].name+"_clean.png";
+      string outfile = string(gb_outdir)+'/'+gb_images[image_num].name+"_clean."+gb_imgext;
       if( ! gb_overwrite && file_exists(outfile.c_str()) ) {
         logger( 0, "error: aborted write to existing file: %s", outfile.c_str() );
         gb_failure = true;
@@ -557,19 +416,20 @@ void* extractionThread( void* _num ) {
       cv::Mat feats = gb_extractor->extractFeats( featimage, slope, slant, xheight, &fpgram, randpert );
 
       /// Write features to file ///
-      if( ! gb_overwrite && file_exists((outname+"."+gb_feaext).c_str()) ) {
-        logger( 0, "error: aborted write to existing file: %s", (outname+"."+gb_feaext).c_str() );
+      char *feaext = gb_extractor->isImageFormat() ? gb_imgext : gb_feaext ;
+      if( ! gb_overwrite && file_exists((outname+"."+feaext).c_str()) ) {
+        logger( 0, "error: aborted write to existing file: %s", (outname+"."+feaext).c_str() );
         gb_failure = true;
       }
-      gb_extractor->write( feats, (outname+"."+gb_feaext).c_str() );
+      gb_extractor->write( feats, (outname+"."+feaext).c_str() );
 
       /// Write features image to file ///
-      if( gb_savefeaimg ) {
-        if( ! gb_overwrite && file_exists((outname+"_fea.png").c_str()) ) {
-          logger( 0, "error: aborted write to existing file: %s", (outname+"_fea.png").c_str() );
+      if( gb_savefeaimg && ! gb_extractor->isImageFormat() ) {
+        if( ! gb_overwrite && file_exists((outname+"_fea."+gb_imgext).c_str()) ) {
+          logger( 0, "error: aborted write to existing file: %s", (outname+"_fea."+gb_imgext).c_str() );
           gb_failure = true;
         }
-        featimage.write( (outname+"_fea.png").c_str() );
+        featimage.write( (outname+"_fea."+gb_imgext).c_str() );
       }
     }
 
@@ -581,14 +441,13 @@ void* extractionThread( void* _num ) {
       char sslope[16], sslant[16];
       int m  = sprintf( sslope, "%g", slope );
       m += sprintf( sslant, "%g", slant );
-      if( slope != 0.0 /*gb_slope*/ )
+      if( slope != 0.0 )
         gb_page->setAttr( xpath.c_str(), "slope", sslope );
-      if( slant != 0.0 /*gb_slant*/ )
+      if( slant != 0.0 )
         gb_page->setAttr( xpath.c_str(), "slant", sslant );
-      //if(  )
-      if( fpgram.size() > 0 /*gb_fpgram*/ )
+      if( fpgram.size() > 0 )
         gb_page->setAttr( xpath.c_str(), "fpgram", gb_page->pointsToString(fpgram).c_str() );
-      if( fcontour.size() > 0 /*gb_fcontour*/ )
+      if( fcontour.size() > 0 )
         gb_page->setAttr( xpath.c_str(), gb_fpoints ? "points" : "fcontour", gb_page->pointsToString(fcontour).c_str() );
     }
 
