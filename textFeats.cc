@@ -7,7 +7,6 @@
 
 /*
  @todo Better parallelization: i.e. threads also read pages
- @todo Fix output list of extractions
 */
 
 /*** Includes *****************************************************************/
@@ -320,9 +319,15 @@ int main( int argc, char *argv[] ) {
     for( int n=gb_numthreads-1; n>=0; n-- )
       pthread_join( gb_threads[n], NULL );
 
-    //if( gb_featlist && ! gb_failure )
-    //  for( int k=0; k<(int)gb_images.size(); k++ )
-    //    printf("%s\n",gb_images[k].name.c_str());
+    /// Extracted features list ///
+    if( gb_featlist && ! gb_failure )
+      for( int k=0; k<(int)gb_images.size(); k++ ) {
+        if( ! gb_numrand )
+          printf("%s\n",gb_images[k].name.c_str());
+        else
+          for( int j=0; j<gb_numrand; j++ )
+            printf("%s_%d\n",gb_images[k].name.c_str(),j);
+      }
 
     /// Save Page XML with feature extraction information ///
     if( gb_isxml && gb_savexml ) {
@@ -450,15 +455,7 @@ void* extractionThread( void* _num ) {
       if( fcontour.size() > 0 )
         gb_page->setAttr( xpath.c_str(), gb_fpoints ? "points" : "fcontour", gb_page->pointsToString(fcontour).c_str() );
     }
-
-    /// Extracted features list ///
-    //if( gb_featlist ) {
-    //  pthread_mutex_lock( &gb_mutex );
-    //  printf("%s\n",gb_images[image_num].name.c_str());
-    //  pthread_mutex_unlock( &gb_mutex );
-    //}
   }
 
   pthread_exit((void*)0);
-  //return NULL;
 }
