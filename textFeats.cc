@@ -442,18 +442,21 @@ void* extractionThread( void* _num ) {
 
     /// Add extraction information to Page XML ///
     if( gb_isxml && gb_savexml ) {
+      // @todo BUG: setting of attributes fails randomly when threads > 1
+      pthread_mutex_lock( &gb_mutex );
       string xpath = string("//*[@id='")+gb_images[image_num].id+"']/_:Coords";
       char sslope[16], sslant[16];
       int m  = sprintf( sslope, "%g", slope );
       m += sprintf( sslant, "%g", slant );
-      if( slope != 0.0 )
+      //if( slope != 0.0 )
         gb_page->setAttr( xpath.c_str(), "slope", sslope );
-      if( slant != 0.0 )
+      //if( slant != 0.0 )
         gb_page->setAttr( xpath.c_str(), "slant", sslant );
       if( fpgram.size() > 0 )
         gb_page->setAttr( xpath.c_str(), "fpgram", gb_page->pointsToString(fpgram).c_str() );
       if( fcontour.size() > 0 )
         gb_page->setAttr( xpath.c_str(), gb_fpoints ? "points" : "fcontour", gb_page->pointsToString(fcontour).c_str() );
+      pthread_mutex_unlock( &gb_mutex );
     }
   }
 
