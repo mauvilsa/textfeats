@@ -121,7 +121,7 @@ void print_usage( FILE *file ) {
   fprintf( file, " -h --help                      Print this usage information and exit\n" );
   fprintf( file, " -v --version                   Print tool version and exit\n" );
   fprintf( file, " -V --verbose[=(-|+|level)]     Verbosity level (def.=%d)\n", verbosity );
-  fprintf( file, " -T --threads NUM               Number of parallel threads (def.=%d)\n", gb_numthreads );
+  //fprintf( file, " -T --threads NUM               Number of parallel threads (def.=%d)\n", gb_numthreads );
   fprintf( file, " -C --cfg CFGFILE               Configuration file for TextFeatExtractor and PageXML (def.=none)\n" );
   fprintf( file, " -O --overwrite[=(true|false)]  Overwrite existing files (def.=%s)\n", strbool(gb_overwrite) );
   fprintf( file, " -o --outdir OUTDIR             Output directory (def.=%s)\n", gb_outdir );
@@ -201,9 +201,9 @@ int main( int argc, char *argv[] ) {
       case OPTION_CFGFILE:
         gb_cfgfile = optarg;
         break;
-      case OPTION_THREADS:
-        gb_numthreads = atoi(optarg);
-        break;
+      //case OPTION_THREADS:
+      //  gb_numthreads = atoi(optarg);
+      //  break;
       case OPTION_VERBOSE:
         if( ! optarg )
           verbosity ++;
