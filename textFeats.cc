@@ -43,6 +43,7 @@ char   gb_default_xpath[] = "//_:TextRegion/_:TextLine/_:Coords[@points and @poi
 char  *gb_cfgfile = NULL;
 bool   gb_overwrite = false;
 char  *gb_outdir = gb_default_outdir;
+bool   gb_baselist = false;
 bool   gb_featlist = false;
 char  *gb_feaext = gb_default_feaext;
 char  *gb_imgext = gb_default_imgext;
@@ -75,8 +76,9 @@ enum {
   OPTION_CFGFILE   = 'C',
   OPTION_OVERWRITE = 'O',
   OPTION_OUTDIR    = 'o',
-  OPTION_FEATLIST  = 'L',
-  OPTION_FEATYPE   = 256,
+  OPTION_BASELIST  = 'L',
+  OPTION_FEATLIST  = 256,
+  OPTION_FEATYPE        ,
   OPTION_FEAEXT         ,
   OPTION_IMGEXT         ,
   OPTION_XPATH          ,
@@ -98,6 +100,7 @@ static struct option gb_long_options[] = {
     { "cfg",         required_argument, NULL, OPTION_CFGFILE },
     { "overwrite",   optional_argument, NULL, OPTION_OVERWRITE },
     { "outdir",      required_argument, NULL, OPTION_OUTDIR },
+    { "baselist",    optional_argument, NULL, OPTION_BASELIST },
     { "featlist",    optional_argument, NULL, OPTION_FEATLIST },
     { "feaext",      required_argument, NULL, OPTION_FEAEXT },
     { "imgext",      required_argument, NULL, OPTION_IMGEXT },
@@ -125,7 +128,8 @@ void print_usage( FILE *file ) {
   fprintf( file, " -C --cfg CFGFILE               Configuration file for TextFeatExtractor and PageXML (def.=none)\n" );
   fprintf( file, " -O --overwrite[=(true|false)]  Overwrite existing files (def.=%s)\n", strbool(gb_overwrite) );
   fprintf( file, " -o --outdir OUTDIR             Output directory (def.=%s)\n", gb_outdir );
-  fprintf( file, " -L --featlist[=(true|false)]   Print list of extracted features to stdout (def.=%s)\n", strbool(gb_featlist) );
+  fprintf( file, " -L --baselist[=(true|false)]   Print list of extracted features bases to stdout (def.=%s)\n", strbool(gb_baselist) );
+  fprintf( file, "    --featlist[=(true|false)]   Print list of extracted feature files to stdout (def.=%s)\n", strbool(gb_featlist) );
   fprintf( file, "    --feaext EXT                Output features file extension (def.=%s)\n", gb_feaext );
   fprintf( file, "    --imgext EXT                Output images file extension (def.=%s)\n", gb_imgext );
   fprintf( file, "    --xpath XPATH               xpath for selecting text samples (def.=%s)\n", gb_xpath );
@@ -167,6 +171,9 @@ int main( int argc, char *argv[] ) {
         break;
       case OPTION_OUTDIR:
         gb_outdir = optarg;
+        break;
+      case OPTION_BASELIST:
+        gb_baselist = parse_bool(optarg);
         break;
       case OPTION_FEATLIST:
         gb_featlist = parse_bool(optarg);
@@ -231,7 +238,6 @@ int main( int argc, char *argv[] ) {
   /// Print configuration ///
   logger( 3, "config: overwrite files: %s", strbool(gb_overwrite) );
   logger( 3, "config: output directory: %s", gb_outdir );
-  logger( 3, "config: print list of extracted features: %s", strbool(gb_featlist) );
   logger( 3, "config: output features file extension: %s", gb_feaext );
   logger( 3, "config: output images file extension: %s", gb_imgext );
   logger( 3, "config: text coords selector xpath: %s", gb_xpath );
@@ -255,6 +261,7 @@ int main( int argc, char *argv[] ) {
   if( verbosity >= 3 )
     extractor.printConf( logfile );
   gb_extractor = &extractor;
+  char *feaext = gb_extractor->isImageFormat() ? gb_imgext : gb_feaext ;
 
   /// Create page loader object ///
   PageXML page(cfg);
@@ -320,17 +327,22 @@ int main( int argc, char *argv[] ) {
       pthread_join( gb_threads[n], NULL );
 
     /// Extracted features list ///
-    if( gb_featlist && ! gb_failure )
+    if( ( gb_baselist || gb_featlist ) && ! gb_failure )
       for( int k=0; k<(int)gb_images.size(); k++ ) {
+        string outname = gb_baselist ? gb_images[k].name : string(gb_outdir)+'/'+gb_images[k].name ;
         if( ! gb_numrand )
-          printf("%s\n",gb_images[k].name.c_str());
-        else
+          printf( "%s\n", gb_baselist ? outname.c_str() : (outname+'.'+feaext).c_str() );
+        else {
           for( int j=0; j<gb_numrand; j++ )
-            printf("%s_%d\n",gb_images[k].name.c_str(),j);
+            if( gb_baselist )
+              printf( "%s_%d\n", outname.c_str(), j );
+            else
+              printf( "%s_%d.%s\n", outname.c_str(), j, feaext );
+        }
       }
 
     /// Save Page XML with feature extraction information ///
-    if( gb_isxml && gb_savexml ) {
+    if( gb_isxml && gb_savexml && gb_images.size() > 0 ) {
       string outfile = string(gb_outdir)+'/'+page.getBase()+".xml";
       if( ! gb_overwrite && file_exists(outfile.c_str()) ) {
         logger( 0, "error: aborted write to existing file: %s", outfile.c_str() );
