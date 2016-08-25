@@ -293,6 +293,7 @@ int main( int argc, char *argv[] ) {
     if( gb_isxml ) {
       tm = chrono::high_resolution_clock::now();
       page.loadXml( argv[n] );
+      page.simplifyIDs();
       gb_images = page.crop( gb_xpath );
       logger( 2, "page read and line cropping time: %.0f ms", time_diff(tm) );
     }
