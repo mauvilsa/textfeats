@@ -19,6 +19,7 @@
 #include <libconfig.h++>
 #include <regex>
 #include <chrono>
+#include <sys/stat.h>
 
 #include "TextFeatExtractor.h"
 #include "PageXML.h"
@@ -282,6 +283,10 @@ int main( int argc, char *argv[] ) {
   for( int n=0; n<gb_numthreads; n++ )
     gb_threadnum[n] = n;
 
+  if( gb_numrand > 1 )
+    for( int n=0; n<gb_numrand; n++ )
+      mkdir( (string(gb_outdir)+'/'+to_string(n)).c_str(), 0755 );
+
   /// Loop for processing input files ///
   for( int n=optind; n<argc; n++ ) {
     logger( 1, "processing file %d: %s", n-optind+1, argv[n] );
@@ -330,16 +335,14 @@ int main( int argc, char *argv[] ) {
     /// Extracted features list ///
     if( ( gb_baselist || gb_featlist ) && ! gb_failure )
       for( int k=0; k<(int)gb_images.size(); k++ ) {
-        string outname = gb_baselist ? gb_images[k].name : string(gb_outdir)+'/'+gb_images[k].name ;
-        if( ! gb_numrand )
-          printf( "%s\n", gb_baselist ? outname.c_str() : (outname+'.'+feaext).c_str() );
-        else {
-          for( int j=0; j<gb_numrand; j++ )
+        if( gb_numrand < 2 )
+          printf( "%s\n", gb_baselist ? gb_images[k].name.c_str() : (string(gb_outdir)+'/'+gb_images[k].name+'.'+feaext).c_str() );
+        else
+          for( int r=0; r<gb_numrand; r++ )
             if( gb_baselist )
-              printf( "%s_%d\n", outname.c_str(), j );
+              printf( "%d/%s\n", r, gb_images[k].name.c_str() );
             else
-              printf( "%s_%d.%s\n", outname.c_str(), j, feaext );
-        }
+              printf( "%s/%d/%s.%s\n", gb_outdir, r, gb_images[k].name.c_str(), feaext );
       }
 
     /// Save Page XML with feature extraction information ///
@@ -418,9 +421,8 @@ void* extractionThread( void* _num ) {
     /// Loop for random perturbation extractions ///
     int R = gb_numrand == 0 ? 1 : gb_numrand ;
     for( int r=0; r<R; r++ ) {
-      bool randpert = r > 0 || ( r== 0 && gb_firstrand ) ;
-      string outname = string(gb_outdir)+'/'+gb_images[image_num].name;
-      outname += gb_numrand ? "_"+to_string(r) : "" ;
+      bool randpert = r > 0 || ( r == 0 && gb_firstrand ) ;
+      string outname = string(gb_outdir)+(gb_numrand>1?"/"+to_string(r):"")+"/"+gb_images[image_num].name;
 
       Magick::Image featimage = prepimage;
 
