@@ -318,7 +318,7 @@ int main( int argc, char *argv[] ) {
         Magick::Image lineimg;
         lineimg.read(argv[m]);
 
-        NamedImage namedline = { linename, linename, lineimg };
+        NamedImage namedline = { linename, linename, 0.0, lineimg };
         gb_images.push_back(namedline);
       }
     }
@@ -408,7 +408,7 @@ void* extractionThread( void* _num ) {
     }
 
     /// Estimate slope and slant (sets them to 0 if disabled) ///
-    gb_extractor->estimateAngles( prepimage, &slope, &slant );
+    gb_extractor->estimateAngles( prepimage, &slope, &slant, gb_images[image_num].rotation );
 
     /// Get x-height ///
     int xheight = 0;
@@ -433,7 +433,7 @@ void* extractionThread( void* _num ) {
       }
 
       /// Extract features ///
-      cv::Mat feats = gb_extractor->extractFeats( featimage, slope, slant, xheight, &fpgram, randpert );
+      cv::Mat feats = gb_extractor->extractFeats( featimage, slope, slant, xheight, &fpgram, randpert, gb_images[image_num].rotation );
 
       /// Write features to file ///
       char *feaext = gb_extractor->isImageFormat() ? gb_imgext : gb_feaext ;
@@ -457,7 +457,7 @@ void* extractionThread( void* _num ) {
 
     /// Add extraction information to Page XML ///
     if( gb_isxml && gb_savexml ) {
-      // @todo BUG: setting of attributes fails randomly when threads > 1
+      // @todo BUG: setting of attributes fails randomly when threads > 1, not thread safe
       pthread_mutex_lock( &gb_mutex );
       string xpath = string("//*[@id='")+gb_images[image_num].id+"']/_:Coords";
       char sslope[16], sslant[16];
