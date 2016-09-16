@@ -33,6 +33,14 @@ static char tool[] = "textFeats";
 static char revnum[] = "$Revision$";
 static char revdate[] = "$Date$";
 
+struct XmlInfo {
+  std::string id;
+  float slope;
+  float slant;
+  vector<cv::Point> fcontour;
+  vector<cv::Point2f> fpgram;
+};
+
 FILE *logfile = NULL;
 int verbosity = 1;
 
@@ -62,6 +70,7 @@ pthread_t           *gb_threads = NULL;
 pthread_mutex_t      gb_mutex = PTHREAD_MUTEX_INITIALIZER;
 unsigned             gb_next_image = 0;
 vector<NamedImage>   gb_images = vector<NamedImage>();
+vector<XmlInfo>      gb_xmlinfo = vector<XmlInfo>();
 int                  gb_numextract = 0;
 bool                 gb_isxml;
 bool                 gb_failure = false;
@@ -125,7 +134,7 @@ void print_usage( FILE *file ) {
   fprintf( file, " -h --help                      Print this usage information and exit\n" );
   fprintf( file, " -v --version                   Print tool version and exit\n" );
   fprintf( file, " -V --verbose[=(-|+|level)]     Verbosity level (def.=%d)\n", verbosity );
-  //fprintf( file, " -T --threads NUM               Number of parallel threads (def.=%d)\n", gb_numthreads );
+  fprintf( file, " -T --threads NUM               Number of parallel threads (def.=%d)\n", gb_numthreads );
   fprintf( file, " -C --cfg CFGFILE               Configuration file for TextFeatExtractor and PageXML (def.=none)\n" );
   fprintf( file, " -O --overwrite[=(true|false)]  Overwrite existing files (def.=%s)\n", strbool(gb_overwrite) );
   fprintf( file, " -o --outdir OUTDIR             Output directory (def.=%s)\n", gb_outdir );
@@ -209,9 +218,9 @@ int main( int argc, char *argv[] ) {
       case OPTION_CFGFILE:
         gb_cfgfile = optarg;
         break;
-      //case OPTION_THREADS:
-      //  gb_numthreads = atoi(optarg);
-      //  break;
+      case OPTION_THREADS:
+        gb_numthreads = atoi(optarg);
+        break;
       case OPTION_VERBOSE:
         if( ! optarg )
           verbosity ++;
@@ -300,6 +309,7 @@ int main( int argc, char *argv[] ) {
       page.loadXml( argv[n] );
       page.simplifyIDs();
       gb_images = page.crop( gb_xpath );
+      gb_xmlinfo.clear();
       logger( 2, "page read and line cropping time: %.0f ms", time_diff(tm) );
     }
 
@@ -352,7 +362,21 @@ int main( int argc, char *argv[] ) {
         logger( 0, "error: aborted write to existing file: %s", outfile.c_str() );
         gb_failure = true;
       }
-      page.write( outfile.c_str() );
+      else {
+        for( int k=0; k<(int)gb_xmlinfo.size(); k++ ) {
+          string xpath = string("//*[@id='")+gb_xmlinfo[k].id+"']/_:Coords";
+          char sslope[16], sslant[16];
+          int m =  sprintf( sslope, "%g", gb_xmlinfo[k].slope );
+              m += sprintf( sslant, "%g", gb_xmlinfo[k].slant );
+          gb_page->setAttr( xpath.c_str(), "slope", sslope );
+          gb_page->setAttr( xpath.c_str(), "slant", sslant );
+          if( gb_xmlinfo[k].fcontour.size() > 0 )
+            gb_page->setAttr( xpath.c_str(), gb_fpoints ? "points" : "fcontour", gb_page->pointsToString(gb_xmlinfo[k].fcontour).c_str() );
+          if( gb_xmlinfo[k].fpgram.size() > 0 )
+            gb_page->setAttr( xpath.c_str(), "fpgram", gb_page->pointsToString(gb_xmlinfo[k].fpgram).c_str() );
+        }
+        page.write( outfile.c_str() );
+      }
     }
   }
 
@@ -375,7 +399,7 @@ void* extractionThread( void* _num ) {
 
   while( true ) {
 
-    /// Thread sage selection of image to process ///
+    /// Thread safe selection of image to process ///
     pthread_mutex_lock( &gb_mutex );
     if( gb_next_image >= gb_images.size() ) {
       pthread_mutex_unlock( &gb_mutex );
@@ -457,20 +481,10 @@ void* extractionThread( void* _num ) {
 
     /// Add extraction information to Page XML ///
     if( gb_isxml && gb_savexml ) {
-      // @todo BUG: setting of attributes fails randomly when threads > 1, not thread safe
       pthread_mutex_lock( &gb_mutex );
-      string xpath = string("//*[@id='")+gb_images[image_num].id+"']/_:Coords";
-      char sslope[16], sslant[16];
-      int m  = sprintf( sslope, "%g", slope );
-      m += sprintf( sslant, "%g", slant );
-      //if( slope != 0.0 )
-        gb_page->setAttr( xpath.c_str(), "slope", sslope );
-      //if( slant != 0.0 )
-        gb_page->setAttr( xpath.c_str(), "slant", sslant );
-      if( fpgram.size() > 0 )
-        gb_page->setAttr( xpath.c_str(), "fpgram", gb_page->pointsToString(fpgram).c_str() );
-      if( fcontour.size() > 0 )
-        gb_page->setAttr( xpath.c_str(), gb_fpoints ? "points" : "fcontour", gb_page->pointsToString(fcontour).c_str() );
+      // libxml not thread safe for modifying xml, thus delaying it
+      XmlInfo xmlinfo = { gb_images[image_num].id, slope, slant, fcontour, fpgram };
+      gb_xmlinfo.push_back(xmlinfo);
       pthread_mutex_unlock( &gb_mutex );
     }
   }
