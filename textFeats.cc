@@ -54,12 +54,14 @@ bool   gb_overwrite = false;
 char  *gb_outdir = gb_default_outdir;
 bool   gb_baselist = false;
 bool   gb_featlist = false;
+bool   gb_onlyid = false;
 char  *gb_feaext = gb_default_feaext;
 char  *gb_imgext = gb_default_imgext;
 char  *gb_xpath = gb_default_xpath;
 bool   gb_saveclean = false;
 bool   gb_savefeaimg = false;
 bool   gb_savexml = false;
+char  *gb_savexmldir = NULL;
 bool   gb_fpoints = true;
 int    gb_numrand = 0;
 bool   gb_firstrand = false;
@@ -88,6 +90,7 @@ enum {
   OPTION_OUTDIR    = 'o',
   OPTION_BASELIST  = 'L',
   OPTION_FEATLIST  = 256,
+  OPTION_ONLYID         ,
   OPTION_FEATYPE        ,
   OPTION_FEAEXT         ,
   OPTION_IMGEXT         ,
@@ -112,6 +115,7 @@ static struct option gb_long_options[] = {
     { "outdir",      required_argument, NULL, OPTION_OUTDIR },
     { "baselist",    optional_argument, NULL, OPTION_BASELIST },
     { "featlist",    optional_argument, NULL, OPTION_FEATLIST },
+    { "onlyid",      optional_argument, NULL, OPTION_ONLYID },
     { "feaext",      required_argument, NULL, OPTION_FEAEXT },
     { "imgext",      required_argument, NULL, OPTION_IMGEXT },
     { "xpath",       required_argument, NULL, OPTION_XPATH },
@@ -140,12 +144,13 @@ void print_usage( FILE *file ) {
   fprintf( file, " -o --outdir OUTDIR             Output directory (def.=%s)\n", gb_outdir );
   fprintf( file, " -L --baselist[=(true|false)]   Print list of extracted features bases to stdout (def.=%s)\n", strbool(gb_baselist) );
   fprintf( file, "    --featlist[=(true|false)]   Print list of extracted feature files to stdout (def.=%s)\n", strbool(gb_featlist) );
+  fprintf( file, "    --onlyid[=(true|false)]     Whether to only use ids for extracted feature names (def.=%s)\n", strbool(gb_onlyid) );
   fprintf( file, "    --feaext EXT                Output features file extension (def.=%s)\n", gb_feaext );
   fprintf( file, "    --imgext EXT                Output images file extension (def.=%s)\n", gb_imgext );
   fprintf( file, "    --xpath XPATH               xpath for selecting text samples (def.=%s)\n", gb_xpath );
   fprintf( file, "    --saveclean[=(true|false)]  Save clean images (def.=%s)\n", strbool(gb_saveclean) );
   fprintf( file, "    --savefeaimg[=(true|false)] Save features images (def.=%s)\n", strbool(gb_savefeaimg) );
-  fprintf( file, "    --savexml[=(true|false)]    Save XML with extraction information (def.=%s)\n", strbool(gb_savexml) );
+  fprintf( file, "    --savexml[=DIR]             Save XML with extraction information (def.=%s)\n", strbool(gb_savexml) );
   fprintf( file, "    --fpoints[=(true|false)]    Store feature contours in points attribute (def.=%s)\n", strbool(gb_fpoints) );
   fprintf( file, "    --rand NUM                  Number of random perturbed extractions per sample (def.=%d)\n", gb_numrand );
   fprintf( file, "    --firstrand[=(true|false)]  Whether the first extraction is perturbed (def.=%s)\n", strbool(gb_firstrand) );
@@ -188,6 +193,9 @@ int main( int argc, char *argv[] ) {
       case OPTION_FEATLIST:
         gb_featlist = parse_bool(optarg);
         break;
+      case OPTION_ONLYID:
+        gb_onlyid = parse_bool(optarg);
+        break;
       case OPTION_FEAEXT:
         gb_feaext = optarg;
         break;
@@ -204,7 +212,9 @@ int main( int argc, char *argv[] ) {
         gb_savefeaimg = parse_bool(optarg);
         break;
       case OPTION_SAVEXML:
-        gb_savexml = parse_bool(optarg);
+        gb_savexml = true;
+        if( optarg )
+          gb_savexmldir = optarg;
         break;
       case OPTION_FPOINTS:
         gb_fpoints = parse_bool(optarg);
@@ -328,7 +338,7 @@ int main( int argc, char *argv[] ) {
         Magick::Image lineimg;
         lineimg.read(argv[m]);
 
-        NamedImage namedline = { linename, linename, 0.0, lineimg };
+        NamedImage namedline = { linename, linename, 0.0, 0, lineimg };
         gb_images.push_back(namedline);
       }
     }
@@ -345,19 +355,20 @@ int main( int argc, char *argv[] ) {
     /// Extracted features list ///
     if( ( gb_baselist || gb_featlist ) && ! gb_failure )
       for( int k=0; k<(int)gb_images.size(); k++ ) {
+        string imgname = gb_onlyid ? gb_images[k].id : gb_images[k].name;
         if( gb_numrand < 2 )
-          printf( "%s\n", gb_baselist ? gb_images[k].name.c_str() : (string(gb_outdir)+'/'+gb_images[k].name+'.'+feaext).c_str() );
+          printf( "%s\n", gb_baselist ? imgname.c_str() : (string(gb_outdir)+'/'+imgname+'.'+feaext).c_str() );
         else
           for( int r=0; r<gb_numrand; r++ )
             if( gb_baselist )
-              printf( "%d/%s\n", r, gb_images[k].name.c_str() );
+              printf( "%d/%s\n", r, imgname.c_str() );
             else
-              printf( "%s/%d/%s.%s\n", gb_outdir, r, gb_images[k].name.c_str(), feaext );
+              printf( "%s/%d/%s.%s\n", gb_outdir, r, imgname.c_str(), feaext );
       }
 
     /// Save Page XML with feature extraction information ///
     if( gb_isxml && gb_savexml && gb_images.size() > 0 ) {
-      string outfile = string(gb_outdir)+'/'+page.getBase()+".xml";
+      string outfile = string(gb_savexmldir!=NULL?gb_savexmldir:gb_outdir)+'/'+page.getBase()+".xml";
       if( ! gb_overwrite && file_exists(outfile.c_str()) ) {
         logger( 0, "error: aborted write to existing file: %s", outfile.c_str() );
         gb_failure = true;
@@ -412,7 +423,8 @@ void* extractionThread( void* _num ) {
 
     /// Perform extraction ///
     chrono::high_resolution_clock::time_point tm = chrono::high_resolution_clock::now();
-    logger( 4, "extracting: %s (thread %d)", gb_images[image_num].name.c_str(), thread );
+    string imgname = gb_onlyid ? gb_images[image_num].id : gb_images[image_num].name;
+    logger( 4, "extracting: %s (thread %d)", imgname.c_str(), thread );
 
     float slope, slant;
     vector<cv::Point2f> fpgram;
@@ -421,9 +433,9 @@ void* extractionThread( void* _num ) {
     Magick::Image prepimage = gb_images[image_num].image;
 
     /// Clean and enhance image ///
-    gb_extractor->preprocess( prepimage, &fcontour );
+    gb_extractor->preprocess( prepimage, gb_savexml ? &fcontour : NULL );
     if( gb_saveclean ) {
-      string outfile = string(gb_outdir)+'/'+gb_images[image_num].name+"_clean."+gb_imgext;
+      string outfile = string(gb_outdir)+'/'+imgname+"_clean."+gb_imgext;
       if( ! gb_overwrite && file_exists(outfile.c_str()) ) {
         logger( 0, "error: aborted write to existing file: %s", outfile.c_str() );
         gb_failure = true;
@@ -446,7 +458,7 @@ void* extractionThread( void* _num ) {
     int R = gb_numrand == 0 ? 1 : gb_numrand ;
     for( int r=0; r<R; r++ ) {
       bool randpert = r > 0 || ( r == 0 && gb_firstrand ) ;
-      string outname = string(gb_outdir)+(gb_numrand>1?"/"+to_string(r):"")+"/"+gb_images[image_num].name;
+      string outname = string(gb_outdir)+(gb_numrand>1?"/"+to_string(r):"")+"/"+imgname;
 
       Magick::Image featimage = prepimage;
 
@@ -457,7 +469,7 @@ void* extractionThread( void* _num ) {
       }
 
       /// Extract features ///
-      cv::Mat feats = gb_extractor->extractFeats( featimage, slope, slant, xheight, &fpgram, randpert, gb_images[image_num].rotation );
+      cv::Mat feats = gb_extractor->extractFeats( featimage, slope, slant, xheight, gb_savexml ? &fpgram : NULL, randpert, gb_images[image_num].rotation, gb_images[image_num].direction );
 
       /// Write features to file ///
       char *feaext = gb_extractor->isImageFormat() ? gb_imgext : gb_feaext ;

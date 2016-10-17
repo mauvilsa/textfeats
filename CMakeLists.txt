@@ -9,6 +9,8 @@ pkg_check_modules( libxml REQUIRED libxml-2.0>=2.9 )
 pkg_check_modules( libcfg REQUIRED libconfig++ )
 pkg_check_modules( hdf5 hdf5-serial )
 
+set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11" )
+
 #find_package( OpenMP )
 #if( OPENMP_FOUND )
 #  #set( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}" )
