@@ -308,13 +308,13 @@ int main( int argc, char *argv[] ) {
 
   /// Loop for processing input files ///
   for( int n=optind; n<argc; n++ ) {
-    logger( 1, "processing file %d: %s", n-optind+1, argv[n] );
-
     gb_isxml = regex_match(argv[n],reXml);
     // @todo Allow "-" for Page XML from stdin
 
     /// Read Page XML file ///
     if( gb_isxml ) {
+      logger( 1, "processing file %d: %s", n-optind+1, argv[n] );
+
       tm = chrono::high_resolution_clock::now();
       page.loadXml( argv[n] );
       page.simplifyIDs();
@@ -341,6 +341,8 @@ int main( int argc, char *argv[] ) {
         NamedImage namedline = { linename, linename, 0.0, 0, lineimg };
         gb_images.push_back(namedline);
       }
+
+      n += (int)gb_images.size()-1;
     }
 
     gb_next_image = 0;
