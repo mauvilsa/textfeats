@@ -33,8 +33,8 @@ static char tool[] = "textFeats";
 static char revnum[] = "$Revision$";
 static char revdate[] = "$Date$";
 
-struct XmlInfo {
-  std::string id;
+struct FeatInfo {
+  int num;
   float slope;
   float slant;
   vector<cv::Point> fcontour;
@@ -72,8 +72,9 @@ pthread_t           *gb_threads = NULL;
 pthread_mutex_t      gb_mutex = PTHREAD_MUTEX_INITIALIZER;
 unsigned             gb_next_image = 0;
 vector<NamedImage>   gb_images = vector<NamedImage>();
-vector<XmlInfo>      gb_xmlinfo = vector<XmlInfo>();
+vector<FeatInfo>     gb_featinfo = vector<FeatInfo>();
 int                  gb_numextract = 0;
+int                  gb_numfailed = 0;
 bool                 gb_isxml;
 bool                 gb_failure = false;
 
@@ -311,6 +312,8 @@ int main( int argc, char *argv[] ) {
     gb_isxml = regex_match(argv[n],reXml);
     // @todo Allow "-" for Page XML from stdin
 
+    gb_featinfo.clear();
+
     /// Read Page XML file ///
     if( gb_isxml ) {
       logger( 1, "processing file %d: %s", n-optind+1, argv[n] );
@@ -319,7 +322,6 @@ int main( int argc, char *argv[] ) {
       page.loadXml( argv[n] );
       page.simplifyIDs();
       gb_images = page.crop( gb_xpath );
-      gb_xmlinfo.clear();
       logger( 2, "page read and line cropping time: %.0f ms", time_diff(tm) );
     }
 
@@ -354,9 +356,15 @@ int main( int argc, char *argv[] ) {
     for( int n=gb_numthreads-1; n>=0; n-- )
       pthread_join( gb_threads[n], NULL );
 
+    gb_numextract += gb_featinfo.size();
+    gb_numfailed += ( (int)gb_images.size() - (int)gb_featinfo.size() );
+    if( gb_images.size() > 0 && (int)gb_featinfo.size() == 0 )
+      gb_failure = true;
+
     /// Extracted features list ///
     if( ( gb_baselist || gb_featlist ) && ! gb_failure )
-      for( int k=0; k<(int)gb_images.size(); k++ ) {
+      for( int kk=0; kk<(int)gb_featinfo.size(); kk++ ) {
+        int k = gb_featinfo[kk].num;
         string imgname = gb_onlyid ? gb_images[k].id : gb_images[k].name;
         if( gb_numrand < 2 )
           printf( "%s\n", gb_baselist ? imgname.c_str() : (string(gb_outdir)+'/'+imgname+'.'+feaext).c_str() );
@@ -376,24 +384,25 @@ int main( int argc, char *argv[] ) {
         gb_failure = true;
       }
       else {
-        for( int k=0; k<(int)gb_xmlinfo.size(); k++ ) {
-          string xpath = string("//*[@id='")+gb_xmlinfo[k].id+"']/_:Coords";
+        for( int k=0; k<(int)gb_featinfo.size(); k++ ) {
+          string xpath = string("//*[@id='")+gb_images[gb_featinfo[k].num].id+"']/_:Coords";
           char sslope[16], sslant[16];
-          int m =  sprintf( sslope, "%g", gb_xmlinfo[k].slope );
-              m += sprintf( sslant, "%g", gb_xmlinfo[k].slant );
+          int m =  sprintf( sslope, "%g", gb_featinfo[k].slope );
+              m += sprintf( sslant, "%g", gb_featinfo[k].slant );
           gb_page->setAttr( xpath.c_str(), "slope", sslope );
           gb_page->setAttr( xpath.c_str(), "slant", sslant );
-          if( gb_xmlinfo[k].fcontour.size() > 0 )
-            gb_page->setAttr( xpath.c_str(), gb_fpoints ? "points" : "fcontour", gb_page->pointsToString(gb_xmlinfo[k].fcontour).c_str() );
-          if( gb_xmlinfo[k].fpgram.size() > 0 )
-            gb_page->setAttr( xpath.c_str(), "fpgram", gb_page->pointsToString(gb_xmlinfo[k].fpgram).c_str() );
+          if( gb_featinfo[k].fcontour.size() > 0 )
+            gb_page->setAttr( xpath.c_str(), gb_fpoints ? "points" : "fcontour", gb_page->pointsToString(gb_featinfo[k].fcontour).c_str() );
+          if( gb_featinfo[k].fpgram.size() > 0 )
+            gb_page->setAttr( xpath.c_str(), "fpgram", gb_page->pointsToString(gb_featinfo[k].fpgram).c_str() );
         }
         page.write( outfile.c_str() );
       }
     }
   }
 
-  logger( 2, "extracted features for %d images", gb_numextract );
+  logger( 0, "warning: %d failed extractions", gb_numfailed );
+  logger( 2, "extracted %d features", gb_numextract );
   logger( 2, "total time: %.0f ms", time_diff(tottm) );
 
   /// Release resources ///
@@ -420,7 +429,6 @@ void* extractionThread( void* _num ) {
     }
     int image_num = gb_next_image;
     gb_next_image++;
-    gb_numextract++;
     pthread_mutex_unlock( &gb_mutex );
 
     /// Perform extraction ///
@@ -428,78 +436,82 @@ void* extractionThread( void* _num ) {
     string imgname = gb_onlyid ? gb_images[image_num].id : gb_images[image_num].name;
     logger( 4, "extracting: %s (thread %d)", imgname.c_str(), thread );
 
-    float slope, slant;
-    vector<cv::Point2f> fpgram;
-    vector<cv::Point> fcontour;
+    try {
 
-    Magick::Image prepimage = gb_images[image_num].image;
+      float slope, slant;
+      vector<cv::Point2f> fpgram;
+      vector<cv::Point> fcontour;
 
-    /// Clean and enhance image ///
-    gb_extractor->preprocess( prepimage, gb_savexml ? &fcontour : NULL );
-    if( gb_saveclean ) {
-      string outfile = string(gb_outdir)+'/'+imgname+"_clean."+gb_imgext;
-      if( ! gb_overwrite && file_exists(outfile.c_str()) ) {
-        logger( 0, "error: aborted write to existing file: %s", outfile.c_str() );
-        gb_failure = true;
-      }
-      prepimage.write( outfile.c_str() );
-    }
+      Magick::Image prepimage = gb_images[image_num].image;
 
-    /// Estimate slope and slant (sets them to 0 if disabled) ///
-    gb_extractor->estimateAngles( prepimage, &slope, &slant, gb_images[image_num].rotation );
-
-    /// Get x-height ///
-    int xheight = 0;
-    if( gb_isxml )
-      xheight = gb_page->getXheight( gb_images[image_num].id.c_str() );
-    // @todo x-height estimation from image
-    //xheight = extractor.estimateXheight( prepimage );
-    //logger( 0, "xheight=%d", xheight );
-
-    /// Loop for random perturbation extractions ///
-    int R = gb_numrand == 0 ? 1 : gb_numrand ;
-    for( int r=0; r<R; r++ ) {
-      bool randpert = r > 0 || ( r == 0 && gb_firstrand ) ;
-      string outname = string(gb_outdir)+(gb_numrand>1?"/"+to_string(r):"")+"/"+imgname;
-
-      Magick::Image featimage = prepimage;
-
-      /// Redo preprocessing for random perturbation ///
-      if( randpert ) {
-        featimage = gb_images[image_num].image;
-        gb_extractor->preprocess( featimage, NULL, randpert );
-      }
-
-      /// Extract features ///
-      cv::Mat feats = gb_extractor->extractFeats( featimage, slope, slant, xheight, gb_savexml ? &fpgram : NULL, randpert, gb_images[image_num].rotation, gb_images[image_num].direction );
-
-      /// Write features to file ///
-      char *feaext = gb_extractor->isImageFormat() ? gb_imgext : gb_feaext ;
-      if( ! gb_overwrite && file_exists((outname+"."+feaext).c_str()) ) {
-        logger( 0, "error: aborted write to existing file: %s", (outname+"."+feaext).c_str() );
-        gb_failure = true;
-      }
-      gb_extractor->write( feats, (outname+"."+feaext).c_str() );
-
-      /// Write features image to file ///
-      if( gb_savefeaimg && ! gb_extractor->isImageFormat() ) {
-        if( ! gb_overwrite && file_exists((outname+"_fea."+gb_imgext).c_str()) ) {
-          logger( 0, "error: aborted write to existing file: %s", (outname+"_fea."+gb_imgext).c_str() );
+      /// Clean and enhance image ///
+      gb_extractor->preprocess( prepimage, gb_savexml ? &fcontour : NULL );
+      if( gb_saveclean ) {
+        string outfile = string(gb_outdir)+'/'+imgname+"_clean."+gb_imgext;
+        if( ! gb_overwrite && file_exists(outfile.c_str()) ) {
+          logger( 0, "error: aborted write to existing file: %s", outfile.c_str() );
           gb_failure = true;
         }
-        featimage.write( (outname+"_fea."+gb_imgext).c_str() );
+        prepimage.write( outfile.c_str() );
       }
-    }
 
-    logger( 3, "feature extraction time: %.0f ms", time_diff(tm) );
+      /// Estimate slope and slant (sets them to 0 if disabled) ///
+      gb_extractor->estimateAngles( prepimage, &slope, &slant, gb_images[image_num].rotation );
 
-    /// Add extraction information to Page XML ///
-    if( gb_isxml && gb_savexml ) {
+      /// Get x-height ///
+      int xheight = 0;
+      if( gb_isxml )
+        xheight = gb_page->getXheight( gb_images[image_num].id.c_str() );
+      // @todo x-height estimation from image
+      //xheight = extractor.estimateXheight( prepimage );
+      //logger( 0, "xheight=%d", xheight );
+
+      /// Loop for random perturbation extractions ///
+      int R = gb_numrand == 0 ? 1 : gb_numrand ;
+      for( int r=0; r<R; r++ ) {
+        bool randpert = r > 0 || ( r == 0 && gb_firstrand ) ;
+        string outname = string(gb_outdir)+(gb_numrand>1?"/"+to_string(r):"")+"/"+imgname;
+
+        Magick::Image featimage = prepimage;
+
+        /// Redo preprocessing for random perturbation ///
+        if( randpert ) {
+          featimage = gb_images[image_num].image;
+          gb_extractor->preprocess( featimage, NULL, randpert );
+        }
+
+        /// Extract features ///
+        cv::Mat feats = gb_extractor->extractFeats( featimage, slope, slant, xheight, gb_savexml ? &fpgram : NULL, randpert, gb_images[image_num].rotation, gb_images[image_num].direction );
+
+        /// Write features to file ///
+        char *feaext = gb_extractor->isImageFormat() ? gb_imgext : gb_feaext ;
+        if( ! gb_overwrite && file_exists((outname+"."+feaext).c_str()) ) {
+          logger( 0, "error: aborted write to existing file: %s", (outname+"."+feaext).c_str() );
+          gb_failure = true;
+        }
+        gb_extractor->write( feats, (outname+"."+feaext).c_str() );
+
+        /// Write features image to file ///
+        if( gb_savefeaimg && ! gb_extractor->isImageFormat() ) {
+          if( ! gb_overwrite && file_exists((outname+"_fea."+gb_imgext).c_str()) ) {
+            logger( 0, "error: aborted write to existing file: %s", (outname+"_fea."+gb_imgext).c_str() );
+            gb_failure = true;
+          }
+          featimage.write( (outname+"_fea."+gb_imgext).c_str() );
+        }
+      }
+
+      logger( 3, "feature extraction time: %.0f ms", time_diff(tm) );
+
+      /// Save extraction information ///
       pthread_mutex_lock( &gb_mutex );
-      // libxml not thread safe for modifying xml, thus delaying it
-      XmlInfo xmlinfo = { gb_images[image_num].id, slope, slant, fcontour, fpgram };
-      gb_xmlinfo.push_back(xmlinfo);
+      FeatInfo featinfo = { image_num, slope, slant, fcontour, fpgram };
+      gb_featinfo.push_back(featinfo);
       pthread_mutex_unlock( &gb_mutex );
+
+    } catch( const std::exception& e ) {
+      logger( 0, "warning: failed extraction: %s", imgname.c_str() );
+      logger( 0, "%s", e.what() );
     }
   }
 
