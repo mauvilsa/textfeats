@@ -401,8 +401,9 @@ int main( int argc, char *argv[] ) {
     }
   }
 
-  logger( 0, "warning: %d failed extractions", gb_numfailed );
-  logger( 2, "extracted %d features", gb_numextract );
+  if( gb_numfailed > 0 )
+    logger( 0, "warning: %d failed extractions", gb_numfailed );
+  logger( 2, "extracted features for %d samples", gb_numextract );
   logger( 2, "total time: %.0f ms", time_diff(tottm) );
 
   /// Release resources ///
