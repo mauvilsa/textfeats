@@ -386,15 +386,16 @@ int main( int argc, char *argv[] ) {
       else {
         for( int k=0; k<(int)gb_featinfo.size(); k++ ) {
           string xpath = string("//*[@id='")+gb_images[gb_featinfo[k].num].id+"']/_:Coords";
+          vector<xmlNodePtr> coords = page.select( xpath );
           char sslope[16], sslant[16];
           int m =  sprintf( sslope, "%g", gb_featinfo[k].slope );
               m += sprintf( sslant, "%g", gb_featinfo[k].slant );
-          gb_page->setAttr( xpath.c_str(), "slope", sslope );
-          gb_page->setAttr( xpath.c_str(), "slant", sslant );
+          gb_page->setAttr( coords, "slope", sslope );
+          gb_page->setAttr( coords, "slant", sslant );
           if( gb_featinfo[k].fcontour.size() > 0 )
-            gb_page->setAttr( xpath.c_str(), gb_fpoints ? "points" : "fcontour", gb_page->pointsToString(gb_featinfo[k].fcontour).c_str() );
+            gb_page->setAttr( coords, gb_fpoints ? "points" : "fcontour", gb_page->pointsToString(gb_featinfo[k].fcontour).c_str() );
           if( gb_featinfo[k].fpgram.size() > 0 )
-            gb_page->setAttr( xpath.c_str(), "fpgram", gb_page->pointsToString(gb_featinfo[k].fpgram).c_str() );
+            gb_page->setAttr( coords, "fpgram", gb_page->pointsToString(gb_featinfo[k].fpgram).c_str() );
         }
         page.write( outfile.c_str() );
       }
