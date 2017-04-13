@@ -19,6 +19,9 @@ set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11" )
 
 set( CMAKE_REQUIRED_INCLUDES "${CMAKE_REQUIRED_INCLUDES};${opencv_INCLUDE_DIRS}" )
 
+add_definitions( -D__PAGEXML_MAGICK__ )
+add_definitions( -D__PAGEXML_LIBCONFIG__ )
+
 file( GLOB tool_SRC "*.cc" )
 add_executable( ${tool_EXE} ${tool_SRC} )
 set_property( TARGET ${tool_EXE} PROPERTY CXX_STANDARD 11 )

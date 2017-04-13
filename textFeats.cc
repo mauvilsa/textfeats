@@ -340,7 +340,10 @@ int main( int argc, char *argv[] ) {
         Magick::Image lineimg;
         lineimg.read(argv[m]);
 
-        NamedImage namedline = { linename, linename, 0.0, 0, lineimg };
+        //NamedImage namedline = { linename, linename, 0.0, 0, 0, 0, lineimg };
+        NamedImage namedline;
+        namedline.id = namedline.name = linename;
+        namedline.image = lineimg;
         gb_images.push_back(namedline);
       }
 
