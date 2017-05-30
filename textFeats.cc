@@ -1,8 +1,9 @@
 /**
  * Tool that extracts text feature vectors for a given Page XMLs or images
  *
- * @version $Revision$$Date::             $
- * @copyright Copyright (c) 2016 to the present, Mauricio Villegas <mauvilsa@upv.es>
+ * @version $Version: 2017.05.30$
+ * @copyright Copyright (c) 2016-present, Mauricio Villegas <mauricio_ville@yahoo.com>
+ * @license MIT License
  */
 
 /*
@@ -30,8 +31,7 @@ using namespace libconfig;
 
 /*** Definitions **************************************************************/
 static char tool[] = "textFeats";
-static char revnum[] = "$Revision$";
-static char revdate[] = "$Date$";
+static char version[] = "Version: 2017.05.30";
 
 struct FeatInfo {
   int num;
@@ -131,8 +131,7 @@ static struct option gb_long_options[] = {
 
 /*** Functions ****************************************************************/
 void print_usage( FILE *file ) {
-  print_svn_rev( file );
-  fprintf( file, "Description: Extracts text feature vectors for given Page XMLs or images\n" );
+  fprintf( file, "Description: Extracts text features for given Page XMLs or images\n" );
   fprintf( file, "Usage 1: %s [options] <page1.xml> [<page2.xml> ...]\n", tool );
   fprintf( file, "Usage 2: %s [options] <textimage1> [<textimage2> ...]\n", tool );
   fprintf( file, "Options:\n" );
@@ -247,7 +246,7 @@ int main( int argc, char *argv[] ) {
         print_usage( logfile );
         return SUCCESS;
       case OPTION_VERSION:
-        print_svn_rev( logfile );
+        fprintf( stderr, "%s %.10s\n", tool, version+10 );
         return SUCCESS;
       default:
         die( "error: incorrect input argument: %s", argv[optind-1] );

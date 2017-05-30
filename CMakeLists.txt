@@ -37,4 +37,4 @@ target_link_libraries( ${tool_EXE} ${Magick_LDFLAGS} ${opencv_LDFLAGS} ${libxml_
 
 install( TARGETS ${tool_EXE} DESTINATION bin )
 
-add_custom_target( realclean cd ${CMAKE_HOME_DIRECTORY} COMMAND rm -fr ${tool_EXE} ${tool_EXE}.exe CMakeFiles CMakeCache.txt cmake_install.cmake install_manifest.txt Makefile )
+add_custom_target( realclean cd ${CMAKE_HOME_DIRECTORY} COMMAND rm -fr ${tool_EXE} ${tool_EXE}.exe ${tool_EXE}.dSYM CMakeFiles CMakeCache.txt cmake_install.cmake install_manifest.txt Makefile )
