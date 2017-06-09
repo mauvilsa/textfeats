@@ -246,7 +246,7 @@ int main( int argc, char *argv[] ) {
         print_usage( logfile );
         return SUCCESS;
       case OPTION_VERSION:
-        fprintf( stderr, "%s %.10s\n", tool, version+9 );
+        fprintf( stderr, "%s %s\n", tool, version+9 );
         fprintf( stderr, "compiled against PageXML %s\n", PageXML::version() );
         fprintf( stderr, "compiled against TextFeatExtractor %s\n", TextFeatExtractor::version() );
         return SUCCESS;
