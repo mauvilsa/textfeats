@@ -1,7 +1,7 @@
 /**
  * Tool that extracts text feature vectors for a given Page XMLs or images
  *
- * @version $Version: 2017.06.09$
+ * @version $Version: 2017.06.15$
  * @copyright Copyright (c) 2016-present, Mauricio Villegas <mauricio_ville@yahoo.com>
  * @license MIT License
  */
@@ -31,7 +31,7 @@ using namespace libconfig;
 
 /*** Definitions **************************************************************/
 static char tool[] = "textFeats";
-static char version[] = "Version: 2017.06.09";
+static char version[] = "Version: 2017.06.15";
 
 struct FeatInfo {
   int num;
@@ -247,7 +247,7 @@ int main( int argc, char *argv[] ) {
         return SUCCESS;
       case OPTION_VERSION:
         fprintf( stderr, "%s %s\n", tool, version+9 );
-        fprintf( stderr, "compiled against PageXML %s\n", PageXML::version() );
+        PageXML::printVersions(stderr);
         fprintf( stderr, "compiled against TextFeatExtractor %s\n", TextFeatExtractor::version() );
         return SUCCESS;
       default:
