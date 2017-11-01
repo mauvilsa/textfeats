@@ -1,7 +1,7 @@
 /**
  * Tool that extracts text feature vectors for a given Page XMLs or images
  *
- * @version $Version: 2017.06.15$
+ * @version $Version: 2017.11.01$
  * @copyright Copyright (c) 2016-present, Mauricio Villegas <mauricio_ville@yahoo.com>
  * @license MIT License
  */
@@ -31,7 +31,7 @@ using namespace libconfig;
 
 /*** Definitions **************************************************************/
 static char tool[] = "textFeats";
-static char version[] = "Version: 2017.06.15";
+static char version[] = "Version: 2017.11.01";
 
 struct FeatInfo {
   int num;
@@ -154,6 +154,9 @@ void print_usage( FILE *file ) {
   fprintf( file, "    --fpoints[=(true|false)]    Store feature contours in points attribute (def.=%s)\n", strbool(gb_fpoints) );
   fprintf( file, "    --rand NUM                  Number of random perturbed extractions per sample (def.=%d)\n", gb_numrand );
   fprintf( file, "    --firstrand[=(true|false)]  Whether the first extraction is perturbed (def.=%s)\n", strbool(gb_firstrand) );
+  fprintf( file, "Default configuration file values:\n" );
+  TextFeatExtractor extractor;
+  extractor.printConf( file );
 }
 
 inline bool file_exists( const char* fname ) {
