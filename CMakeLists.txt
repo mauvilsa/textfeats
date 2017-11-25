@@ -6,6 +6,7 @@ find_package( HDF5 REQUIRED )
 pkg_check_modules( Magick REQUIRED Magick++>=6.8 )
 pkg_check_modules( opencv REQUIRED opencv>=2.4 )
 pkg_check_modules( libxml REQUIRED libxml-2.0>=2.9 )
+pkg_check_modules( libxslt REQUIRED libxslt )
 pkg_check_modules( libcfg REQUIRED libconfig++ )
 pkg_check_modules( hdf5 hdf5-serial )
 
@@ -26,14 +27,14 @@ file( GLOB tool_SRC "*.cc" )
 add_executable( ${tool_EXE} ${tool_SRC} )
 set_property( TARGET ${tool_EXE} PROPERTY CXX_STANDARD 11 )
 
-string( REPLACE ";" " " CFLAGS_STR "-Wall -W ${Magick_CFLAGS} ${opencv_CFLAGS} ${libxml_CFLAGS} ${hdf5_CFLAGS}" )
+string( REPLACE ";" " " CFLAGS_STR "-Wall -W ${Magick_CFLAGS} ${opencv_CFLAGS} ${libxml_CFLAGS} ${libxslt_CFLAGS} ${hdf5_CFLAGS}" )
 set_target_properties( ${tool_EXE} PROPERTIES COMPILE_FLAGS "${CFLAGS_STR}" )
 
 include_directories( SYSTEM ${Magick_INCLUDEDIR} ) # To suppress system header warnings
 
 include_directories( ${HDF5_INCLUDE_DIRS} )
 
-target_link_libraries( ${tool_EXE} ${Magick_LDFLAGS} ${opencv_LDFLAGS} ${libxml_LDFLAGS} ${libcfg_LDFLAGS} ${HDF5_LIBRARIES} ${hdf5_LDFLAGS} hdf5_cpp pthread jpeg tiff png m )
+target_link_libraries( ${tool_EXE} ${Magick_LDFLAGS} ${opencv_LDFLAGS} ${libxml_LDFLAGS} ${libxslt_LDFLAGS} ${libcfg_LDFLAGS} ${HDF5_LIBRARIES} ${hdf5_LDFLAGS} hdf5_cpp pthread jpeg tiff png m )
 
 install( TARGETS ${tool_EXE} DESTINATION bin )
 
