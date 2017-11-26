@@ -1,7 +1,7 @@
 /**
  * Tool that extracts text feature vectors for a given Page XMLs or images
  *
- * @version $Version: 2017.11.01$
+ * @version $Version: 2017.11.26$
  * @copyright Copyright (c) 2016-present, Mauricio Villegas <mauricio_ville@yahoo.com>
  * @license MIT License
  */
@@ -31,7 +31,7 @@ using namespace libconfig;
 
 /*** Definitions **************************************************************/
 static char tool[] = "textFeats";
-static char version[] = "Version: 2017.11.01";
+static char version[] = "Version: 2017.11.26";
 
 struct FeatInfo {
   int num;
@@ -385,24 +385,28 @@ int main( int argc, char *argv[] ) {
 
     /// Save Page XML with feature extraction information ///
     if( gb_isxml && gb_savexml && gb_images.size() > 0 ) {
-      string outfile = string(gb_savexmldir!=NULL?gb_savexmldir:gb_outdir)+'/'+page.getBase()+".xml";
+      string outfile = string(gb_savexmldir!=NULL?gb_savexmldir:gb_outdir)+'/'+regex_replace(argv[n],regex(".*/"),"");
       if( ! gb_overwrite && file_exists(outfile.c_str()) ) {
         logger( 0, "error: aborted write to existing file: %s", outfile.c_str() );
         gb_failure = true;
       }
       else {
         for( int k=0; k<(int)gb_featinfo.size(); k++ ) {
-          string xpath = string("//*[@id='")+gb_images[gb_featinfo[k].num].id+"']/_:Coords";
-          vector<xmlNodePtr> coords = page.select( xpath );
-          char sslope[16], sslant[16];
-          int m =  sprintf( sslope, "%g", gb_featinfo[k].slope );
-              m += sprintf( sslant, "%g", gb_featinfo[k].slant );
-          gb_page->setAttr( coords, "slope", sslope );
-          gb_page->setAttr( coords, "slant", sslant );
-          if( gb_featinfo[k].fcontour.size() > 0 )
-            gb_page->setAttr( coords, gb_fpoints ? "points" : "fcontour", gb_page->pointsToString(gb_featinfo[k].fcontour).c_str() );
+          string xpath = string("//*[@id='")+gb_images[gb_featinfo[k].num].id+"']";
+          xmlNodePtr elem = page.selectNth( xpath, 0 );
+          char sslope[24], sslant[24];
+          snprintf( sslope, sizeof sslope, "%g", gb_featinfo[k].slope );
+          snprintf( sslant, sizeof sslant, "%g", gb_featinfo[k].slant );
+          gb_page->setProperty( elem, "slope", sslope );
+          gb_page->setProperty( elem, "slant", sslant );
+          if( gb_featinfo[k].fcontour.size() > 0 ) {
+            if( gb_fpoints )
+              gb_page->setCoords( elem, gb_featinfo[k].fcontour );
+            else
+              gb_page->setProperty( elem, "fcontour", gb_page->pointsToString(gb_featinfo[k].fcontour).c_str() );
+          }
           if( gb_featinfo[k].fpgram.size() > 0 )
-            gb_page->setAttr( coords, "fpgram", gb_page->pointsToString(gb_featinfo[k].fpgram).c_str() );
+            gb_page->setProperty( elem, "fpgram", gb_page->pointsToString(gb_featinfo[k].fpgram).c_str() );
         }
         page.write( outfile.c_str() );
       }
