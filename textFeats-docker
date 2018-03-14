@@ -5,26 +5,34 @@ if ( [ "$#" = 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ] ); then
 DESCRIPTION
   Command line interface to textFeats installed in a docker container. It assumes
   that docker is installed, that it can be executed without sudo and that the
-  corresponding image is tagged as textfeats:active. It will only work if the
-  arguments do not contain spaces or special characters according to bash and is
+  corresponding image is tagged as textfeats:active. It will only work if it is
   executed from and referencing only files in the host's /Users, /home, /mnt,
-  /media, /opt or /tmp directories.
+  /media or /tmp directories.
 
 SYNOPSIS
   Usage 1: textFeats-docker [options] <page1.xml> [<page2.xml> ...]
   Usage 2: textFeats-docker [options] <textimage1> [<textimage2> ...]
 ";
-  docker run --rm --log-driver none textfeats:active textFeats --help 2>&1 | sed -n '/^Options/,$p';
+  docker run --rm --log-driver none textfeats:active textFeats --help 2>&1 | sed -n '/^Options/,$p' 1>&2;
   exit 0;
 fi
 
-OPTS=( -u $(id -u):$(id -g) );
+CMD=("$@");
+CMD=("${CMD[@]//$'\x27'/$'\x27\x22\x27\x22\x27'}");
+CMD=("${CMD[@]/#/$'\x27'}");
+CMD=("${CMD[@]/%/$'\x27'}");
+
+OPTS=( --user $(id -u):$(id -g) );
+OPTS+=( --rm );
+OPTS+=( --workdir "$(pwd)" );
+OPTS+=( --interactive );
+OPTS+=( --log-driver none );
+OPTS+=( --env TERM=xterm-256color );
 [ -d "/Users" ] && OPTS+=( -v /Users:/Users );
 [ -d "/home" ]  && OPTS+=( -v /home:/home );
 [ -d "/mnt" ]   && OPTS+=( -v /mnt:/mnt );
 [ -d "/media" ] && OPTS+=( -v /media:/media );
-[ -d "/opt" ]   && OPTS+=( -v /opt:/opt );
 [ -d "/tmp" ]   && OPTS+=( -v /tmp:/tmp );
 
-docker run --rm --log-driver none --interactive "${OPTS[@]}" textfeats:active \
-  bash -c "cd $(pwd) && PATH=\".:$PATH:\$PATH\" TERM=xterm-256color textFeats $*";
+docker run "${OPTS[@]}" textfeats:active \
+  bash -c "textFeats ${CMD[*]}";
