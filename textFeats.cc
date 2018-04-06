@@ -1,7 +1,7 @@
 /**
  * Tool that extracts text feature vectors for a given Page XMLs or images
  *
- * @version $Version: 2017.11.26$
+ * @version $Version: 2018.04.06$
  * @copyright Copyright (c) 2016-present, Mauricio Villegas <mauricio_ville@yahoo.com>
  * @license MIT License
  */
@@ -31,7 +31,7 @@ using namespace libconfig;
 
 /*** Definitions **************************************************************/
 static char tool[] = "textFeats";
-static char version[] = "Version: 2017.11.26";
+static char version[] = "Version: 2018.04.06";
 
 struct FeatInfo {
   int num;
@@ -65,6 +65,9 @@ char  *gb_savexmldir = NULL;
 bool   gb_fpoints = true;
 int    gb_numrand = 0;
 bool   gb_firstrand = false;
+bool   gb_join = false;
+bool   gb_join_nth = false;
+vector<bool> gb_join_write;
 
 int                  gb_numthreads = 1;
 int                 *gb_threadnum = NULL;
@@ -101,6 +104,7 @@ enum {
   OPTION_SAVEXML        ,
   OPTION_FPOINTS        ,
   OPTION_NUMRAND        ,
+  OPTION_JOIN           ,
   OPTION_FIRSTRAND
 };
 
@@ -126,6 +130,7 @@ static struct option gb_long_options[] = {
     { "fpoints",     optional_argument, NULL, OPTION_FPOINTS },
     { "rand",        required_argument, NULL, OPTION_NUMRAND },
     { "firstrand",   optional_argument, NULL, OPTION_FIRSTRAND },
+    { "join",        optional_argument, NULL, OPTION_JOIN },
     { 0, 0, 0, 0 }
   };
 
@@ -154,6 +159,7 @@ void print_usage( FILE *file ) {
   fprintf( file, "    --fpoints[=(true|false)]    Store feature contours in points attribute (def.=%s)\n", strbool(gb_fpoints) );
   fprintf( file, "    --rand NUM                  Number of random perturbed extractions per sample (def.=%d)\n", gb_numrand );
   fprintf( file, "    --firstrand[=(true|false)]  Whether the first extraction is perturbed (def.=%s)\n", strbool(gb_firstrand) );
+  fprintf( file, "    --join[=(true|false)]       Joins features with common parent for xml input (def.=%s)\n", strbool(gb_join) );
   fprintf( file, "Default configuration file values:\n" );
   TextFeatExtractor extractor;
   extractor.printConf( file );
@@ -227,6 +233,9 @@ int main( int argc, char *argv[] ) {
         break;
       case OPTION_FIRSTRAND:
         gb_firstrand = parse_bool(optarg);
+        break;
+      case OPTION_JOIN:
+        gb_join = parse_bool(optarg);
         break;
       case OPTION_CFGFILE:
         gb_cfgfile = optarg;
@@ -317,6 +326,8 @@ int main( int argc, char *argv[] ) {
     // @todo Allow "-" for Page XML from stdin
 
     gb_featinfo.clear();
+    gb_join_write.clear();
+    gb_join_nth = false;
 
     /// Read Page XML file ///
     if( gb_isxml ) {
@@ -327,6 +338,20 @@ int main( int argc, char *argv[] ) {
       page.simplifyIDs();
       gb_images = page.crop( gb_xpath );
       logger( 2, "page read and line cropping time: %.0f ms", time_diff(tm) );
+
+      if ( gb_join ) {
+        gb_join_nth = true;
+        gb_numthreads = 1;
+        gb_numrand = 0;
+        vector<xmlNodePt> sel = page.select(gb_xpath);
+        int num = sel.size();
+        gb_join_write.resize(num);
+        xmlNodePt prev = NULL;
+        for ( int k=num-1; k>=0; k-- ) {
+          gb_join_write[k] = sel[k]->parent->parent != prev ? true : false;
+          prev = sel[k]->parent->parent;
+        }
+      }
     }
 
     /// Or read a set of input images ///
@@ -372,15 +397,21 @@ int main( int argc, char *argv[] ) {
     if( ( gb_baselist || gb_featlist ) && ! gb_failure )
       for( int kk=0; kk<(int)gb_featinfo.size(); kk++ ) {
         int k = gb_featinfo[kk].num;
-        string imgname = gb_onlyid ? gb_images[k].id : gb_images[k].name;
-        if( gb_numrand < 2 )
+        if ( ! gb_join_nth ) {
+          string imgname = gb_onlyid ? gb_images[k].id : gb_images[k].name;
+          if( gb_numrand < 2 )
+            printf( "%s\n", gb_baselist ? imgname.c_str() : (string(gb_outdir)+'/'+imgname+'.'+feaext).c_str() );
+          else
+            for( int r=0; r<gb_numrand; r++ )
+              if( gb_baselist )
+                printf( "%d/%s\n", r, imgname.c_str() );
+              else
+                printf( "%s/%d/%s.%s\n", gb_outdir, r, imgname.c_str(), feaext );
+        }
+        else if ( gb_join_write[k] ) {
+          string imgname = gb_page->getNodeName( gb_images[k].node->parent->parent );
           printf( "%s\n", gb_baselist ? imgname.c_str() : (string(gb_outdir)+'/'+imgname+'.'+feaext).c_str() );
-        else
-          for( int r=0; r<gb_numrand; r++ )
-            if( gb_baselist )
-              printf( "%d/%s\n", r, imgname.c_str() );
-            else
-              printf( "%s/%d/%s.%s\n", gb_outdir, r, imgname.c_str(), feaext );
+        }
       }
 
     /// Save Page XML with feature extraction information ///
@@ -392,8 +423,9 @@ int main( int argc, char *argv[] ) {
       }
       else {
         for( int k=0; k<(int)gb_featinfo.size(); k++ ) {
-          string xpath = string("//*[@id='")+gb_images[gb_featinfo[k].num].id+"']";
-          xmlNodePtr elem = page.selectNth( xpath, 0 );
+          //string xpath = string("//*[@id='")+gb_images[gb_featinfo[k].num].id+"']";
+          //xmlNodePtr elem = page.selectNth( xpath, 0 );
+          xmlNodePtr elem = gb_images[gb_featinfo[k].num].node;
           char sslope[24], sslant[24];
           snprintf( sslope, sizeof sslope, "%g", gb_featinfo[k].slope );
           snprintf( sslant, sizeof sslant, "%g", gb_featinfo[k].slant );
@@ -431,6 +463,8 @@ int main( int argc, char *argv[] ) {
  */
 void* extractionThread( void* _num ) {
   int thread = *((int*)_num);
+
+  cv::Mat join_feats;
 
   while( true ) {
 
@@ -484,6 +518,8 @@ void* extractionThread( void* _num ) {
       for( int r=0; r<R; r++ ) {
         bool randpert = r > 0 || ( r == 0 && gb_firstrand ) ;
         string outname = string(gb_outdir)+(gb_numrand>1?"/"+to_string(r):"")+"/"+imgname;
+        if ( gb_join_nth && gb_join_write[image_num] )
+          outname = string(gb_outdir)+"/"+gb_page->getNodeName( gb_images[image_num].node->parent->parent );
 
         Magick::Image featimage = prepimage;
 
@@ -502,7 +538,18 @@ void* extractionThread( void* _num ) {
           logger( 0, "error: aborted write to existing file: %s", (outname+"."+feaext).c_str() );
           gb_failure = true;
         }
-        gb_extractor->write( feats, (outname+"."+feaext).c_str() );
+        if ( ! gb_join_nth )
+          gb_extractor->write( feats, (outname+"."+feaext).c_str() );
+        else {
+          if ( join_feats.cols == 0 )
+            join_feats = feats;
+          else
+            cv::hconcat(join_feats,feats,join_feats);
+          if ( gb_join_write[image_num] ) {
+            gb_extractor->write( join_feats, (outname+"."+feaext).c_str() );
+            join_feats = cv::Mat();
+          }
+        }
 
         /// Write features image to file ///
         if( gb_savefeaimg && ! gb_extractor->isImageFormat() ) {
