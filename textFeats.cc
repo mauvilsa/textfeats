@@ -1,7 +1,7 @@
 /**
  * Tool that extracts text feature vectors for a given Page XMLs or images
  *
- * @version $Version: 2018.04.06$
+ * @version $Version: 2018.04.09$
  * @copyright Copyright (c) 2016-present, Mauricio Villegas <mauricio_ville@yahoo.com>
  * @license MIT License
  */
@@ -31,7 +31,7 @@ using namespace libconfig;
 
 /*** Definitions **************************************************************/
 static char tool[] = "textFeats";
-static char version[] = "Version: 2018.04.06";
+static char version[] = "Version: 2018.04.09";
 
 struct FeatInfo {
   int num;
@@ -162,6 +162,11 @@ void print_usage( FILE *file ) {
   fprintf( file, "    --join[=(true|false)]       Joins features with common parent for xml input (def.=%s)\n", strbool(gb_join) );
   fprintf( file, "Default configuration file values:\n" );
   TextFeatExtractor extractor;
+  if( gb_cfgfile != NULL ) {
+    Config cfg;
+    cfg.readFile(gb_cfgfile);
+    extractor = TextFeatExtractor(cfg);
+  }
   extractor.printConf( file );
 }
 
@@ -369,7 +374,6 @@ int main( int argc, char *argv[] ) {
         Magick::Image lineimg;
         lineimg.read(argv[m]);
 
-        //NamedImage namedline = { linename, linename, 0.0, 0, 0, 0, lineimg };
         NamedImage namedline;
         namedline.id = namedline.name = linename;
         namedline.image = lineimg;
@@ -423,9 +427,7 @@ int main( int argc, char *argv[] ) {
       }
       else {
         for( int k=0; k<(int)gb_featinfo.size(); k++ ) {
-          //string xpath = string("//*[@id='")+gb_images[gb_featinfo[k].num].id+"']";
-          //xmlNodePtr elem = page.selectNth( xpath, 0 );
-          xmlNodePtr elem = gb_images[gb_featinfo[k].num].node;
+          xmlNodePtr elem = gb_images[gb_featinfo[k].num].node->parent;
           char sslope[24], sslant[24];
           snprintf( sslope, sizeof sslope, "%g", gb_featinfo[k].slope );
           snprintf( sslant, sizeof sslant, "%g", gb_featinfo[k].slant );
