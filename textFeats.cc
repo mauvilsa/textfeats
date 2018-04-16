@@ -1,7 +1,7 @@
 /**
  * Tool that extracts text feature vectors for a given Page XMLs or images
  *
- * @version $Version: 2018.04.09$
+ * @version $Version: 2018.04.16$
  * @copyright Copyright (c) 2016-present, Mauricio Villegas <mauricio_ville@yahoo.com>
  * @license MIT License
  */
@@ -31,7 +31,7 @@ using namespace libconfig;
 
 /*** Definitions **************************************************************/
 static char tool[] = "textFeats";
-static char version[] = "Version: 2018.04.09";
+static char version[] = "Version: 2018.04.16";
 
 struct FeatInfo {
   int num;
@@ -545,8 +545,13 @@ void* extractionThread( void* _num ) {
         else {
           if ( join_feats.cols == 0 )
             join_feats = feats;
-          else
+          else {
+            if ( join_feats.rows != feats.rows ) {
+              logger( 0, "error: not possible to join if there is no height normalization" );
+              exit(1);
+            }
             cv::hconcat(join_feats,feats,join_feats);
+          }
           if ( gb_join_write[image_num] ) {
             gb_extractor->write( join_feats, (outname+"."+feaext).c_str() );
             join_feats = cv::Mat();
