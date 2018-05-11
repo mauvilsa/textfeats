@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PcGts xmlns="http://schema.primaresearch.org/PAGE/gts/pagecontent/2013-07-15">
+  <Metadata>
+    <Creator>nw-page-editor</Creator>
+    <Created>2018-05-11T14:11:37Z</Created>
+    <LastChange>2018-05-11T14:13:33Z</LastChange>
+  </Metadata>
+  <Page imageFilename="test-image.png" imageHeight="68" imageWidth="229">
+    <TextRegion id="r1">
+      <Coords points="0,0 228,0 228,67 0,67"/>
+      <TextLine id="r1_l1">
+        <Property key="slope" value="0"/>
+        <Property key="slant" value="33"/>
+        <Coords points="5,22 35,53 43,50 84,50 99,64 107,63 120,50 168,50 181,63 189,64 204,50 216,49 224,43 217,31 164,31 155,23 151,24 147,31 103,31 88,17 72,17 58,3 41,18 9,18"/>
+        <Baseline points="6.34571,43.8514 222.595,44.6042"/>
+      </TextLine>
+    </TextRegion>
+  </Page>
+</PcGts>

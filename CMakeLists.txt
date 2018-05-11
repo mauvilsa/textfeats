@@ -36,7 +36,14 @@ include_directories( ${HDF5_INCLUDE_DIRS} )
 
 target_link_libraries( ${tool_EXE} ${Magick_LDFLAGS} ${opencv_LDFLAGS} ${libxml_LDFLAGS} ${libxslt_LDFLAGS} ${libcfg_LDFLAGS} ${HDF5_LIBRARIES} ${hdf5_LDFLAGS} hdf5_cpp pthread jpeg tiff png m )
 
+enable_testing()
+add_test( NAME raw_xml_extraction
+          COMMAND ${CMAKE_COMMAND}
+          -DTEST_PROG=$<TARGET_FILE:${tool_EXE}>
+          -DSOURCEDIR=${CMAKE_CURRENT_SOURCE_DIR}
+          -P ${CMAKE_CURRENT_SOURCE_DIR}/test/raw_xml_extraction.cmake )
+
 install( TARGETS ${tool_EXE} DESTINATION bin )
 add_custom_target( install-docker cp ${CMAKE_HOME_DIRECTORY}/textFeats-docker ${CMAKE_INSTALL_PREFIX}/bin )
 
-add_custom_target( realclean cd ${CMAKE_HOME_DIRECTORY} COMMAND rm -fr ${tool_EXE} ${tool_EXE}.exe ${tool_EXE}.dSYM CMakeFiles CMakeCache.txt cmake_install.cmake install_manifest.txt Makefile )
+add_custom_target( realclean cd ${CMAKE_HOME_DIRECTORY} COMMAND rm -fr ${tool_EXE} ${tool_EXE}.exe ${tool_EXE}.dSYM CMakeFiles CMakeCache.txt cmake_install.cmake install_manifest.txt Makefile CTestTestfile.cmake Testing )

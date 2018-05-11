@@ -1,7 +1,7 @@
 /**
  * Tool that extracts text feature vectors for a given Page XMLs or images
  *
- * @version $Version: 2018.04.16$
+ * @version $Version: 2018.05.11$
  * @copyright Copyright (c) 2016-present, Mauricio Villegas <mauricio_ville@yahoo.com>
  * @license MIT License
  */
@@ -31,7 +31,7 @@ using namespace libconfig;
 
 /*** Definitions **************************************************************/
 static char tool[] = "textFeats";
-static char version[] = "Version: 2018.04.16";
+static char version[] = "Version: 2018.05.11";
 
 struct FeatInfo {
   int num;
@@ -61,6 +61,7 @@ char  *gb_xpath = gb_default_xpath;
 bool   gb_saveclean = false;
 bool   gb_savefeaimg = false;
 bool   gb_savexml = false;
+bool   gb_regproc = true;
 char  *gb_savexmldir = NULL;
 bool   gb_fpoints = true;
 int    gb_numrand = 0;
@@ -102,6 +103,7 @@ enum {
   OPTION_SAVECLEAN      ,
   OPTION_SAVEFEAIMG     ,
   OPTION_SAVEXML        ,
+  OPTION_REGPROC        ,
   OPTION_FPOINTS        ,
   OPTION_NUMRAND        ,
   OPTION_JOIN           ,
@@ -127,6 +129,7 @@ static struct option gb_long_options[] = {
     { "saveclean",   optional_argument, NULL, OPTION_SAVECLEAN },
     { "savefeaimg",  optional_argument, NULL, OPTION_SAVEFEAIMG },
     { "savexml",     optional_argument, NULL, OPTION_SAVEXML },
+    { "regproc",     optional_argument, NULL, OPTION_REGPROC },
     { "fpoints",     optional_argument, NULL, OPTION_FPOINTS },
     { "rand",        required_argument, NULL, OPTION_NUMRAND },
     { "firstrand",   optional_argument, NULL, OPTION_FIRSTRAND },
@@ -156,6 +159,7 @@ void print_usage( FILE *file ) {
   fprintf( file, "    --saveclean[=(true|false)]  Save clean images (def.=%s)\n", strbool(gb_saveclean) );
   fprintf( file, "    --savefeaimg[=(true|false)] Save features images (def.=%s)\n", strbool(gb_savefeaimg) );
   fprintf( file, "    --savexml[=DIR]             Save XML with extraction information (def.=%s)\n", strbool(gb_savexml) );
+  fprintf( file, "    --regproc[=(true|false)]    Register process in extraction XML (def.=%s)\n", strbool(gb_regproc) );
   fprintf( file, "    --fpoints[=(true|false)]    Store feature contours in points attribute (def.=%s)\n", strbool(gb_fpoints) );
   fprintf( file, "    --rand NUM                  Number of random perturbed extractions per sample (def.=%d)\n", gb_numrand );
   fprintf( file, "    --firstrand[=(true|false)]  Whether the first extraction is perturbed (def.=%s)\n", strbool(gb_firstrand) );
@@ -229,6 +233,9 @@ int main( int argc, char *argv[] ) {
         gb_savexml = true;
         if( optarg )
           gb_savexmldir = optarg;
+        break;
+      case OPTION_REGPROC:
+        gb_regproc = parse_bool(optarg);
         break;
       case OPTION_FPOINTS:
         gb_fpoints = parse_bool(optarg);
@@ -340,6 +347,8 @@ int main( int argc, char *argv[] ) {
 
       tm = chrono::high_resolution_clock::now();
       page.loadXml( argv[n] );
+      if( gb_regproc )
+        page.processStart(tool);
       page.simplifyIDs();
       gb_images = page.crop( gb_xpath );
       logger( 2, "page read and line cropping time: %.0f ms", time_diff(tm) );
@@ -442,6 +451,8 @@ int main( int argc, char *argv[] ) {
           if( gb_featinfo[k].fpgram.size() > 0 )
             gb_page->setProperty( elem, "fpgram", gb_page->pointsToString(gb_featinfo[k].fpgram).c_str() );
         }
+        if( gb_regproc )
+          page.processEnd();
         page.write( outfile.c_str() );
       }
     }
