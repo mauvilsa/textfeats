@@ -300,13 +300,20 @@ int main( int argc, char *argv[] ) {
 
   /// Load configuration ///
   Config cfg;
-  if( gb_cfgfile != NULL )
+  if( gb_cfgfile != NULL ) {
+    if( ! file_exists(gb_cfgfile) )
+      die( "error: config file does not exist: %s", gb_cfgfile );
     try {
       cfg.readFile(gb_cfgfile);
     }
     catch( const ParseException &pex ) {
       die( "error: parse error in config file at line %d: %s", pex.getLine(), pex.getError() );
     }
+  }
+
+  /// Check that output directory exists ///
+  if( ! file_exists(gb_outdir) )
+    die( "error: output directory does not exist: %s", gb_outdir );
 
   /// Create feature extractor object ///
   TextFeatExtractor extractor(cfg);
