@@ -1,7 +1,7 @@
 /**
  * Tool that extracts text feature vectors for a given Page XMLs or images
  *
- * @version $Version: 2018.05.11$
+ * @version $Version: 2018.06.05$
  * @copyright Copyright (c) 2016-present, Mauricio Villegas <mauricio_ville@yahoo.com>
  * @license MIT License
  */
@@ -31,7 +31,7 @@ using namespace libconfig;
 
 /*** Definitions **************************************************************/
 static char tool[] = "textFeats";
-static char version[] = "Version: 2018.05.11";
+static char version[] = "Version: 2018.06.05";
 
 struct FeatInfo {
   int num;
@@ -58,6 +58,7 @@ bool   gb_onlyid = false;
 char  *gb_feaext = gb_default_feaext;
 char  *gb_imgext = gb_default_imgext;
 char  *gb_xpath = gb_default_xpath;
+char  *gb_basexpath = NULL;
 bool   gb_saveclean = false;
 bool   gb_savefeaimg = false;
 bool   gb_savexml = false;
@@ -100,6 +101,7 @@ enum {
   OPTION_FEAEXT         ,
   OPTION_IMGEXT         ,
   OPTION_XPATH          ,
+  OPTION_BASEXPATH      ,
   OPTION_SAVECLEAN      ,
   OPTION_SAVEFEAIMG     ,
   OPTION_SAVEXML        ,
@@ -126,6 +128,7 @@ static struct option gb_long_options[] = {
     { "feaext",      required_argument, NULL, OPTION_FEAEXT },
     { "imgext",      required_argument, NULL, OPTION_IMGEXT },
     { "xpath",       required_argument, NULL, OPTION_XPATH },
+    { "basexpath",   required_argument, NULL, OPTION_BASEXPATH },
     { "saveclean",   optional_argument, NULL, OPTION_SAVECLEAN },
     { "savefeaimg",  optional_argument, NULL, OPTION_SAVEFEAIMG },
     { "savexml",     optional_argument, NULL, OPTION_SAVEXML },
@@ -156,6 +159,7 @@ void print_usage( FILE *file ) {
   fprintf( file, "    --feaext EXT                Output features file extension (def.=%s)\n", gb_feaext );
   fprintf( file, "    --imgext EXT                Output images file extension (def.=%s)\n", gb_imgext );
   fprintf( file, "    --xpath XPATH               xpath for selecting text samples (def.=%s)\n", gb_xpath );
+  fprintf( file, "    --basexpath XPATH           xpath for getting the XML base string (def.=use image basename)\n" );
   fprintf( file, "    --saveclean[=(true|false)]  Save clean images (def.=%s)\n", strbool(gb_saveclean) );
   fprintf( file, "    --savefeaimg[=(true|false)] Save features images (def.=%s)\n", strbool(gb_savefeaimg) );
   fprintf( file, "    --savexml[=DIR]             Save XML with extraction information (def.=%s)\n", strbool(gb_savexml) );
@@ -222,6 +226,9 @@ int main( int argc, char *argv[] ) {
         break;
       case OPTION_XPATH:
         gb_xpath = optarg;
+        break;
+      case OPTION_BASEXPATH:
+        gb_basexpath = optarg;
         break;
       case OPTION_SAVECLEAN:
         gb_saveclean = parse_bool(optarg);
@@ -350,7 +357,7 @@ int main( int argc, char *argv[] ) {
       if( gb_regproc )
         page.processStart(tool);
       page.simplifyIDs();
-      gb_images = page.crop( gb_xpath );
+      gb_images = page.crop( gb_xpath, NULL, true, NULL, gb_basexpath );
       logger( 2, "page read and line cropping time: %.0f ms", time_diff(tm) );
 
       if ( gb_join ) {
