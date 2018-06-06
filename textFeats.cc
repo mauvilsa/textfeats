@@ -1,7 +1,7 @@
 /**
  * Tool that extracts text feature vectors for a given Page XMLs or images
  *
- * @version $Version: 2018.06.05$
+ * @version $Version: 2018.06.06$
  * @copyright Copyright (c) 2016-present, Mauricio Villegas <mauricio_ville@yahoo.com>
  * @license MIT License
  */
@@ -31,7 +31,7 @@ using namespace libconfig;
 
 /*** Definitions **************************************************************/
 static char tool[] = "textFeats";
-static char version[] = "Version: 2018.06.05";
+static char version[] = "Version: 2018.06.06";
 
 struct FeatInfo {
   int num;
@@ -63,6 +63,7 @@ int    gb_density = 0;
 bool   gb_saveclean = false;
 bool   gb_savefeaimg = false;
 bool   gb_savexml = false;
+bool   gb_xmlbasepath = false;
 bool   gb_regproc = true;
 char  *gb_savexmldir = NULL;
 bool   gb_fpoints = true;
@@ -107,6 +108,7 @@ enum {
   OPTION_SAVECLEAN      ,
   OPTION_SAVEFEAIMG     ,
   OPTION_SAVEXML        ,
+  OPTION_XMLBASEXPATH   ,
   OPTION_REGPROC        ,
   OPTION_FPOINTS        ,
   OPTION_NUMRAND        ,
@@ -135,6 +137,7 @@ static struct option gb_long_options[] = {
     { "saveclean",   optional_argument, NULL, OPTION_SAVECLEAN },
     { "savefeaimg",  optional_argument, NULL, OPTION_SAVEFEAIMG },
     { "savexml",     optional_argument, NULL, OPTION_SAVEXML },
+    { "xmlbasexpath",optional_argument, NULL, OPTION_XMLBASEXPATH },
     { "regproc",     optional_argument, NULL, OPTION_REGPROC },
     { "fpoints",     optional_argument, NULL, OPTION_FPOINTS },
     { "rand",        required_argument, NULL, OPTION_NUMRAND },
@@ -167,6 +170,7 @@ void print_usage( FILE *file ) {
   fprintf( file, "    --saveclean[=(true|false)]  Save clean images (def.=%s)\n", strbool(gb_saveclean) );
   fprintf( file, "    --savefeaimg[=(true|false)] Save features images (def.=%s)\n", strbool(gb_savefeaimg) );
   fprintf( file, "    --savexml[=DIR]             Save XML with extraction information (def.=%s)\n", strbool(gb_savexml) );
+  fprintf( file, "    --xmlbasexpath[=(true|false)] Use basexpath for extraction XML file name (def.=%s)\n", strbool(gb_xmlbasepath) );
   fprintf( file, "    --regproc[=(true|false)]    Register process in extraction XML (def.=%s)\n", strbool(gb_regproc) );
   fprintf( file, "    --fpoints[=(true|false)]    Store feature contours in points attribute (def.=%s)\n", strbool(gb_fpoints) );
   fprintf( file, "    --rand NUM                  Number of random perturbed extractions per sample (def.=%d)\n", gb_numrand );
@@ -247,6 +251,9 @@ int main( int argc, char *argv[] ) {
         gb_savexml = true;
         if( optarg )
           gb_savexmldir = optarg;
+        break;
+      case OPTION_XMLBASEXPATH:
+        gb_xmlbasepath = parse_bool(optarg);
         break;
       case OPTION_REGPROC:
         gb_regproc = parse_bool(optarg);
@@ -452,7 +459,8 @@ int main( int argc, char *argv[] ) {
 
     /// Save Page XML with feature extraction information ///
     if( gb_isxml && gb_savexml && gb_images.size() > 0 ) {
-      string outfile = string(gb_savexmldir!=NULL?gb_savexmldir:gb_outdir)+'/'+regex_replace(argv[n],regex(".*/"),"");
+      string outfile = gb_xmlbasepath ? gb_page->getValue(gb_page->selectNth(gb_basexpath))+".xml" : string(argv[n]);
+      outfile = string(gb_savexmldir!=NULL?gb_savexmldir:gb_outdir)+'/'+regex_replace(outfile,regex(".*/"),"");
       if( ! gb_overwrite && file_exists(outfile.c_str()) ) {
         logger( 0, "error: aborted write to existing file: %s", outfile.c_str() );
         gb_failure = true;
