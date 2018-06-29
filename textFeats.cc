@@ -1,7 +1,7 @@
 /**
  * Tool that extracts text feature vectors for a given Page XMLs or images
  *
- * @version $Version: 2018.06.06$
+ * @version $Version: 2018.06.29$
  * @copyright Copyright (c) 2016-present, Mauricio Villegas <mauricio_ville@yahoo.com>
  * @license MIT License
  */
@@ -31,7 +31,7 @@ using namespace libconfig;
 
 /*** Definitions **************************************************************/
 static char tool[] = "textFeats";
-static char version[] = "Version: 2018.06.06";
+static char version[] = "Version: 2018.06.29";
 
 struct FeatInfo {
   int num;
@@ -468,11 +468,9 @@ int main( int argc, char *argv[] ) {
       else {
         for( int k=0; k<(int)gb_featinfo.size(); k++ ) {
           xmlNodePtr elem = gb_images[gb_featinfo[k].num].node->parent;
-          char sslope[24], sslant[24];
-          snprintf( sslope, sizeof sslope, "%g", gb_featinfo[k].slope );
-          snprintf( sslant, sizeof sslant, "%g", gb_featinfo[k].slant );
-          gb_page->setProperty( elem, "slope", sslope );
-          gb_page->setProperty( elem, "slant", sslant );
+          gb_page->setProperty( elem, "rotation", gb_images[gb_featinfo[k].num].rotation );
+          gb_page->setProperty( elem, "slope", gb_featinfo[k].slope );
+          gb_page->setProperty( elem, "slant", gb_featinfo[k].slant );
           if( gb_featinfo[k].fcontour.size() > 0 ) {
             if( gb_fpoints )
               gb_page->setCoords( elem, gb_featinfo[k].fcontour );
@@ -487,6 +485,8 @@ int main( int argc, char *argv[] ) {
         page.write( outfile.c_str() );
       }
     }
+    else if( gb_savexml && ! gb_isxml )
+      logger( 0, "warning: requested to save xml but input is not xml" );
   }
 
   if( gb_numfailed > 0 )
