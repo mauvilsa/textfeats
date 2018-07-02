@@ -1,7 +1,7 @@
 /**
  * Tool that extracts text feature vectors for a given Page XMLs or images
  *
- * @version $Version: 2018.06.29$
+ * @version $Version: 2018.07.02$
  * @copyright Copyright (c) 2016-present, Mauricio Villegas <mauricio_ville@yahoo.com>
  * @license MIT License
  */
@@ -31,7 +31,7 @@ using namespace libconfig;
 
 /*** Definitions **************************************************************/
 static char tool[] = "textFeats";
-static char version[] = "Version: 2018.06.29";
+static char version[] = "Version: 2018.07.02";
 
 struct FeatInfo {
   int num;
@@ -80,6 +80,7 @@ pthread_mutex_t      gb_mutex = PTHREAD_MUTEX_INITIALIZER;
 unsigned             gb_next_image = 0;
 vector<NamedImage>   gb_images = vector<NamedImage>();
 vector<FeatInfo>     gb_featinfo = vector<FeatInfo>();
+vector<int>          gb_featfail = vector<int>();
 int                  gb_numextract = 0;
 int                  gb_numfailed = 0;
 bool                 gb_isxml;
@@ -366,6 +367,7 @@ int main( int argc, char *argv[] ) {
     // @todo Allow "-" for Page XML from stdin
 
     gb_featinfo.clear();
+    gb_featfail.clear();
     gb_join_write.clear();
     gb_join_nth = false;
 
@@ -466,6 +468,10 @@ int main( int argc, char *argv[] ) {
         gb_failure = true;
       }
       else {
+        for( int k=0; k<(int)gb_featfail.size(); k++ ) {
+          xmlNodePtr elem = gb_images[gb_featfail[k]].node->parent;
+          gb_page->setProperty( elem, "textFeats-failed" );
+        }
         for( int k=0; k<(int)gb_featinfo.size(); k++ ) {
           xmlNodePtr elem = gb_images[gb_featinfo[k].num].node->parent;
           gb_page->setProperty( elem, "rotation", gb_images[gb_featinfo[k].num].rotation );
@@ -619,6 +625,7 @@ void* extractionThread( void* _num ) {
       pthread_mutex_unlock( &gb_mutex );
 
     } catch( const std::exception& e ) {
+      gb_featfail.push_back(image_num);
       logger( 0, "warning: failed extraction: %s", imgname.c_str() );
       logger( 0, "%s", e.what() );
     }
