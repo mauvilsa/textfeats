@@ -1,7 +1,7 @@
 /**
  * Tool that extracts text feature vectors for a given Page XMLs or images
  *
- * @version $Version: 2018.07.02$
+ * @version $Version: 2018.07.06$
  * @copyright Copyright (c) 2016-present, Mauricio Villegas <mauricio_ville@yahoo.com>
  * @license MIT License
  */
@@ -31,7 +31,7 @@ using namespace libconfig;
 
 /*** Definitions **************************************************************/
 static char tool[] = "textFeats";
-static char version[] = "Version: 2018.07.02";
+static char version[] = "Version: 2018.07.06";
 
 struct FeatInfo {
   int num;
@@ -495,8 +495,12 @@ int main( int argc, char *argv[] ) {
       logger( 0, "warning: requested to save xml but input is not xml" );
   }
 
-  if( gb_numfailed > 0 )
-    logger( 0, "warning: %d failed extractions", gb_numfailed );
+  if( gb_numfailed > 0 ) {
+    if( gb_numextract == 0 )
+      logger( 0, "error: all extractions failed" );
+    else
+      logger( 0, "warning: %d failed extractions", gb_numfailed );
+  }
   logger( 2, "extracted features for %d samples", gb_numextract );
   logger( 2, "total time: %.0f ms", time_diff(tottm) );
 
