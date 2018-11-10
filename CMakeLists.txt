@@ -2,13 +2,13 @@ cmake_minimum_required( VERSION 2.8.4 )
 project( textFeats )
 set( tool_EXE textFeats )
 find_package( PkgConfig )
-find_package( HDF5 REQUIRED )
+#find_package( HDF5 REQUIRED )
 pkg_check_modules( Magick REQUIRED Magick++>=6.8 )
 pkg_check_modules( opencv REQUIRED opencv>=2.4 )
 pkg_check_modules( libxml REQUIRED libxml-2.0>=2.9 )
 pkg_check_modules( libxslt REQUIRED libxslt )
 pkg_check_modules( libcfg REQUIRED libconfig++ )
-pkg_check_modules( hdf5 hdf5-serial )
+#pkg_check_modules( hdf5 hdf5-serial )
 
 set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11" )
 
@@ -21,6 +21,8 @@ set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11" )
 set( CMAKE_REQUIRED_INCLUDES "${CMAKE_REQUIRED_INCLUDES};${opencv_INCLUDE_DIRS}" )
 
 add_definitions( -D__PAGEXML_MAGICK__ )
+add_definitions( -D__PAGEXML_IMG_MAGICK__ )
+#add_definitions( -D__PAGEXML_IMG_CV__ )
 add_definitions( -D__PAGEXML_LIBCONFIG__ )
 
 file( GLOB tool_SRC "*.cc" )
@@ -32,9 +34,10 @@ set_target_properties( ${tool_EXE} PROPERTIES COMPILE_FLAGS "${CFLAGS_STR}" )
 
 include_directories( SYSTEM ${Magick_INCLUDEDIR} ) # To suppress system header warnings
 
-include_directories( ${HDF5_INCLUDE_DIRS} )
+#include_directories( ${HDF5_INCLUDE_DIRS} )
 
-target_link_libraries( ${tool_EXE} ${Magick_LDFLAGS} ${opencv_LDFLAGS} ${libxml_LDFLAGS} ${libxslt_LDFLAGS} ${libcfg_LDFLAGS} ${HDF5_LIBRARIES} ${hdf5_LDFLAGS} hdf5_cpp pthread jpeg tiff png m )
+#target_link_libraries( ${tool_EXE} ${Magick_LDFLAGS} ${opencv_LDFLAGS} ${libxml_LDFLAGS} ${libxslt_LDFLAGS} ${libcfg_LDFLAGS} ${HDF5_LIBRARIES} ${hdf5_LDFLAGS} hdf5_cpp pthread jpeg tiff png m )
+target_link_libraries( ${tool_EXE} ${Magick_LDFLAGS} ${opencv_LDFLAGS} ${libxml_LDFLAGS} ${libxslt_LDFLAGS} ${libcfg_LDFLAGS} pthread jpeg tiff png m )
 
 enable_testing()
 add_test( NAME raw_xml_extraction

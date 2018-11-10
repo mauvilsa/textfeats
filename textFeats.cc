@@ -412,8 +412,12 @@ int main( int argc, char *argv[] ) {
           base_match[1].str() :
           argvn ;
 
-        Magick::Image lineimg;
+        PageImage lineimg;
+#if defined (__PAGEXML_IMG_MAGICK__)
         lineimg.read(argv[m]);
+#elif defined (__PAGEXML_IMG_CV__)
+        lineimg = cv::imread(argv[m]);
+#endif
 
         NamedImage namedline;
         namedline.id = namedline.name = linename;
@@ -543,9 +547,10 @@ void* extractionThread( void* _num ) {
       vector<cv::Point2f> fpgram;
       vector<cv::Point> fcontour;
 
-      Magick::Image prepimage = gb_images[image_num].image;
+      PageImage prepimage = gb_images[image_num].image;
 
       /// Clean and enhance image ///
+      logger( 5, "preprocessing: %s (thread %d)", imgname.c_str(), thread );
       gb_extractor->preprocess( prepimage, gb_savexml ? &fcontour : NULL );
       if( gb_saveclean ) {
         string outfile = string(gb_outdir)+'/'+imgname+"_clean."+gb_imgext;
@@ -553,10 +558,15 @@ void* extractionThread( void* _num ) {
           logger( 0, "error: aborted write to existing file: %s", outfile.c_str() );
           gb_failure = true;
         }
+#if defined (__PAGEXML_IMG_MAGICK__)
         prepimage.write( outfile.c_str() );
+#elif defined (__PAGEXML_IMG_CV__)
+        imwrite( outfile.c_str(), prepimage );
+#endif
       }
 
       /// Estimate slope and slant (sets them to 0 if disabled) ///
+      logger( 5, "estimating angles: %s (thread %d)", imgname.c_str(), thread );
       gb_extractor->estimateAngles( prepimage, &slope, &slant, gb_images[image_num].rotation );
 
       /// Get x-height ///
@@ -575,7 +585,7 @@ void* extractionThread( void* _num ) {
         if ( gb_join_nth && gb_join_write[image_num] )
           outname = string(gb_outdir)+"/"+gb_page->getNodeName( gb_images[image_num].node->parent->parent );
 
-        Magick::Image featimage = prepimage;
+        PageImage featimage = prepimage;
 
         /// Redo preprocessing for random perturbation ///
         if( randpert ) {
@@ -584,6 +594,7 @@ void* extractionThread( void* _num ) {
         }
 
         /// Extract features ///
+        logger( 5, "extraction: %s (thread %d)", imgname.c_str(), thread );
         cv::Mat feats = gb_extractor->extractFeats( featimage, slope, slant, xheight, gb_savexml ? &fpgram : NULL, randpert, gb_images[image_num].rotation, gb_images[image_num].direction );
 
         /// Write features to file ///
@@ -616,7 +627,11 @@ void* extractionThread( void* _num ) {
             logger( 0, "error: aborted write to existing file: %s", (outname+"_fea."+gb_imgext).c_str() );
             gb_failure = true;
           }
+#if defined (__PAGEXML_IMG_MAGICK__)
           featimage.write( (outname+"_fea."+gb_imgext).c_str() );
+#elif defined (__PAGEXML_IMG_CV__)
+          imwrite( (outname+"_fea."+gb_imgext).c_str(), featimage );
+#endif
         }
       }
 
