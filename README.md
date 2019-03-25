@@ -4,7 +4,7 @@ textFeats - A tool that extracts text features for given Page XMLs or images.
 
 # INSTALLATION AND USAGE
 
-    git clone https://github.com/mauvilsa/textFeats
+    git clone --recursive https://github.com/mauvilsa/textFeats
     mkdir textFeats/build
     cd textFeats/build
     cmake -DCMAKE_INSTALL_PREFIX:PATH=$HOME ..
