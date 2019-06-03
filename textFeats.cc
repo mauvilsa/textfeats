@@ -339,10 +339,11 @@ int main( int argc, char *argv[] ) {
   char *feaext = gb_extractor->isImageFormat() ? gb_imgext : gb_feaext ;
 
   /// Create page loader object ///
-  PageXML page(cfg);
-  //page.loadConf( cfg );
-  if( verbosity >= 3 )
-    page.printConf( logfile );
+  PageXML page;
+  //PageXML page(cfg);
+  ////page.loadConf( cfg );
+  //if( verbosity >= 3 )
+  //  page.printConf( logfile );
   gb_page = &page;
 
   /// Auxiliary stuff ///
