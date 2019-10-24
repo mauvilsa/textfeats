@@ -1,7 +1,7 @@
 /**
  * Tool that extracts text feature vectors for a given Page XMLs or images
  *
- * @version $Version: 2018.07.06$
+ * @version $Version: 2019.10.24$
  * @copyright Copyright (c) 2016-present, Mauricio Villegas <mauricio_ville@yahoo.com>
  * @license MIT License
  */
@@ -31,7 +31,7 @@ using namespace libconfig;
 
 /*** Definitions **************************************************************/
 static char tool[] = "textFeats";
-static char version[] = "Version: 2018.07.06";
+static char version[] = "Version: 2019.10.24";
 
 struct FeatInfo {
   int num;
@@ -60,6 +60,7 @@ char  *gb_imgext = gb_default_imgext;
 char  *gb_xpath = gb_default_xpath;
 char  *gb_basexpath = NULL;
 int    gb_density = 0;
+int    gb_skipwide = 0;
 bool   gb_saveclean = false;
 bool   gb_savefeaimg = false;
 bool   gb_savexml = false;
@@ -80,8 +81,10 @@ pthread_mutex_t      gb_mutex = PTHREAD_MUTEX_INITIALIZER;
 unsigned             gb_next_image = 0;
 vector<NamedImage>   gb_images = vector<NamedImage>();
 vector<FeatInfo>     gb_featinfo = vector<FeatInfo>();
+vector<int>          gb_featskip = vector<int>();
 vector<int>          gb_featfail = vector<int>();
 int                  gb_numextract = 0;
+int                  gb_numskipped = 0;
 int                  gb_numfailed = 0;
 bool                 gb_isxml;
 bool                 gb_failure = false;
@@ -106,6 +109,7 @@ enum {
   OPTION_XPATH          ,
   OPTION_BASEXPATH      ,
   OPTION_DENSITY        ,
+  OPTION_SKIPWIDE       ,
   OPTION_SAVECLEAN      ,
   OPTION_SAVEFEAIMG     ,
   OPTION_SAVEXML        ,
@@ -135,6 +139,7 @@ static struct option gb_long_options[] = {
     { "xpath",       required_argument, NULL, OPTION_XPATH },
     { "basexpath",   required_argument, NULL, OPTION_BASEXPATH },
     { "density",     required_argument, NULL, OPTION_DENSITY },
+    { "skipwide",    required_argument, NULL, OPTION_SKIPWIDE },
     { "saveclean",   optional_argument, NULL, OPTION_SAVECLEAN },
     { "savefeaimg",  optional_argument, NULL, OPTION_SAVEFEAIMG },
     { "savexml",     optional_argument, NULL, OPTION_SAVEXML },
@@ -168,6 +173,7 @@ void print_usage( FILE *file ) {
   fprintf( file, "    --xpath XPATH               xpath for selecting text samples (def.=%s)\n", gb_xpath );
   fprintf( file, "    --basexpath XPATH           xpath for getting the XML base string (def.=use image basename)\n" );
   fprintf( file, "    --density DENSITY           Density for pdf to image conversion (def.=unspecified)\n" );
+  fprintf( file, "    --skipwide MAX_WIDTH        Whether to skip writing images wider than given width (def.=false)\n" );
   fprintf( file, "    --saveclean[=(true|false)]  Save clean images (def.=%s)\n", strbool(gb_saveclean) );
   fprintf( file, "    --savefeaimg[=(true|false)] Save features images (def.=%s)\n", strbool(gb_savefeaimg) );
   fprintf( file, "    --savexml[=DIR]             Save XML with extraction information (def.=%s)\n", strbool(gb_savexml) );
@@ -241,6 +247,9 @@ int main( int argc, char *argv[] ) {
         break;
       case OPTION_DENSITY:
         gb_density = atoi(optarg);
+        break;
+      case OPTION_SKIPWIDE:
+        gb_skipwide = atoi(optarg);
         break;
       case OPTION_SAVECLEAN:
         gb_saveclean = parse_bool(optarg);
@@ -368,6 +377,7 @@ int main( int argc, char *argv[] ) {
     // @todo Allow "-" for Page XML from stdin
 
     gb_featinfo.clear();
+    gb_featskip.clear();
     gb_featfail.clear();
     gb_join_write.clear();
     gb_join_nth = false;
@@ -439,7 +449,8 @@ int main( int argc, char *argv[] ) {
       pthread_join( gb_threads[n], NULL );
 
     gb_numextract += gb_featinfo.size();
-    gb_numfailed += ( (int)gb_images.size() - (int)gb_featinfo.size() );
+    gb_numskipped += gb_featskip.size();
+    gb_numfailed += gb_featfail.size();
     if( gb_images.size() > 0 && (int)gb_featinfo.size() == 0 )
       gb_failure = true;
 
@@ -477,6 +488,10 @@ int main( int argc, char *argv[] ) {
           xmlNodePtr elem = gb_images[gb_featfail[k]].node->parent;
           gb_page->setProperty( elem, "textFeats-failed" );
         }
+        for( int k=0; k<(int)gb_featskip.size(); k++ ) {
+          xmlNodePtr elem = gb_images[gb_featskip[k]].node->parent;
+          gb_page->setProperty( elem, "textFeats-skipped" );
+        }
         for( int k=0; k<(int)gb_featinfo.size(); k++ ) {
           xmlNodePtr elem = gb_images[gb_featinfo[k].num].node->parent;
           gb_page->setProperty( elem, "rotation", gb_images[gb_featinfo[k].num].rotation );
@@ -500,6 +515,8 @@ int main( int argc, char *argv[] ) {
       logger( 0, "warning: requested to save xml but input is not xml" );
   }
 
+  if( gb_numskipped > 0 )
+      logger( 0, "warning: %d skipped extractions", gb_numskipped );
   if( gb_numfailed > 0 ) {
     if( gb_numextract == 0 )
       logger( 0, "error: all extractions failed" );
@@ -579,6 +596,7 @@ void* extractionThread( void* _num ) {
       //logger( 0, "xheight=%d", xheight );
 
       /// Loop for random perturbation extractions ///
+      bool skipsample = false;
       int R = gb_numrand == 0 ? 1 : gb_numrand ;
       for( int r=0; r<R; r++ ) {
         bool randpert = r > 0 || ( r == 0 && gb_firstrand ) ;
@@ -597,6 +615,12 @@ void* extractionThread( void* _num ) {
         /// Extract features ///
         logger( 5, "extraction: %s (thread %d)", imgname.c_str(), thread );
         cv::Mat feats = gb_extractor->extractFeats( featimage, slope, slant, xheight, gb_savexml ? &fpgram : NULL, randpert, gb_images[image_num].rotation, gb_images[image_num].direction );
+
+        /// Check whether to skip wide feats ///
+        if ( gb_skipwide && feats.cols > gb_skipwide ) {
+          skipsample = true;
+          break;
+        }
 
         /// Write features to file ///
         char *feaext = gb_extractor->isImageFormat() ? gb_imgext : gb_feaext ;
@@ -640,12 +664,18 @@ void* extractionThread( void* _num ) {
 
       /// Save extraction information ///
       pthread_mutex_lock( &gb_mutex );
-      FeatInfo featinfo = { image_num, slope, slant, fcontour, fpgram };
-      gb_featinfo.push_back(featinfo);
+      if ( skipsample )
+        gb_featskip.push_back(image_num);
+      else {
+        FeatInfo featinfo = { image_num, slope, slant, fcontour, fpgram };
+        gb_featinfo.push_back(featinfo);
+      }
       pthread_mutex_unlock( &gb_mutex );
 
     } catch( const std::exception& e ) {
+      pthread_mutex_lock( &gb_mutex );
       gb_featfail.push_back(image_num);
+      pthread_mutex_unlock( &gb_mutex );
       logger( 0, "warning: failed extraction: %s", imgname.c_str() );
       logger( 0, "%s", e.what() );
     }
